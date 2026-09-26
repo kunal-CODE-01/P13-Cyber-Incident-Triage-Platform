@@ -30,6 +30,60 @@ from collections import deque
 from datetime import datetime
 import threading
 import time
+import os
+import sqlite3
+
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_DB_PATH = os.path.join(_BASE_DIR, "users.db")
+
+def _get_db():
+    conn = sqlite3.connect(_DB_PATH, timeout=5.0)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA busy_timeout = 5000;")
+    return conn
+
+def _init_packet_db():
+    try:
+        conn = _get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS live_packet_buffer (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                time TEXT,
+                timestamp TEXT,
+                src TEXT,
+                dst TEXT,
+                protocol TEXT,
+                sport TEXT,
+                dport TEXT,
+                length INTEGER,
+                flags TEXT,
+                ttl TEXT,
+                src_mac TEXT,
+                dst_mac TEXT,
+                risk TEXT,
+                info TEXT,
+                payload_length INTEGER,
+                payload_preview TEXT,
+                hex_preview TEXT
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS live_capture_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_live_pkt_id ON live_packet_buffer(id DESC);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_live_pkt_proto ON live_packet_buffer(protocol);")
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+_init_packet_db()
 
 
 # ============================================================
@@ -350,6 +404,51 @@ def _record(pkt):
 
     try:
 
+        if isinstance(pkt, dict):
+            _sequence += 1
+            record = {
+                "id": _sequence,
+                "time": pkt.get("time", datetime.now().strftime("%H:%M:%S.%f")[:-3]),
+                "timestamp": pkt.get("timestamp", datetime.now().isoformat()),
+                "src": str(pkt.get("src", "-")),
+                "dst": str(pkt.get("dst", "-")),
+                "protocol": str(pkt.get("protocol", "OTHER")),
+                "sport": pkt.get("sport", "-"),
+                "dport": pkt.get("dport", "-"),
+                "flags": pkt.get("flags", "-"),
+                "length": int(pkt.get("length", 0)),
+                "ttl": pkt.get("ttl", "-"),
+                "src_mac": pkt.get("src_mac", "-"),
+                "dst_mac": pkt.get("dst_mac", "-"),
+                "info": pkt.get("info", ""),
+                "risk": pkt.get("risk", "NORMAL"),
+                "payload_preview": pkt.get("payload_preview", ""),
+                "payload_length": int(pkt.get("payload_length", 0)),
+                "hex_preview": pkt.get("hex_preview", "")
+            }
+            with _lock:
+                _packets.append(record)
+                if len(_packets) > MAX_PACKETS:
+                    _packets.pop(0)
+            try:
+                conn = _get_db()
+                conn.execute("""
+                    INSERT INTO live_packet_buffer 
+                    (id, time, timestamp, src, dst, protocol, sport, dport, flags, length, ttl, src_mac, dst_mac, info, risk, payload_preview, payload_length, hex_preview)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    record["id"], record["time"], record["timestamp"], record["src"], record["dst"],
+                    record["protocol"], str(record["sport"]), str(record["dport"]), record["flags"],
+                    record["length"], str(record["ttl"]), record["src_mac"], record["dst_mac"],
+                    record["info"], record["risk"], record["payload_preview"], record["payload_length"], record["hex_preview"]
+                ))
+                conn.execute("DELETE FROM live_packet_buffer WHERE id NOT IN (SELECT id FROM live_packet_buffer ORDER BY id DESC LIMIT 500)")
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+            return
+
         _sequence += 1
 
         packet_id = _sequence
@@ -619,6 +718,26 @@ def _record(pkt):
                 record
             )
 
+        try:
+            conn = _get_db()
+            conn.execute("""
+                INSERT INTO live_packet_buffer 
+                (time, timestamp, src, dst, protocol, sport, dport, length, flags, ttl, src_mac, dst_mac, risk, info, payload_length, payload_preview, hex_preview)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                record["time"], record["timestamp"], record["src"], record["dst"],
+                record["protocol"], str(record["sport"]), str(record["dport"]),
+                record["length"], record["flags"], str(record["ttl"]),
+                record["src_mac"], record["dst_mac"], record["risk"], record["info"],
+                record["payload_length"], record["payload_preview"], record["hex_preview"]
+            ))
+            if _sequence % 200 == 0:
+                conn.execute("DELETE FROM live_packet_buffer WHERE id NOT IN (SELECT id FROM live_packet_buffer ORDER BY id DESC LIMIT 5000)")
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
         return record
 
     except Exception as exc:
@@ -681,6 +800,15 @@ def _worker(interface):
 
         while not _stop_event.is_set():
 
+            try:
+                conn = _get_db()
+                row = conn.execute("SELECT value FROM live_capture_meta WHERE key = 'running'").fetchone()
+                conn.close()
+                if row and row[0] == "0":
+                    break
+            except Exception:
+                pass
+
             sniff(
 
                 iface=interface or None,
@@ -700,6 +828,13 @@ def _worker(interface):
     finally:
 
         _running = False
+        try:
+            conn = _get_db()
+            conn.execute("INSERT OR REPLACE INTO live_capture_meta (key, value) VALUES ('running', '0')")
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
 
 
 # ============================================================
@@ -801,6 +936,16 @@ def start_capture(iface=None):
 
     _running = True
 
+    try:
+        conn = _get_db()
+        conn.execute("INSERT OR REPLACE INTO live_capture_meta (key, value) VALUES ('running', '1')")
+        conn.execute("INSERT OR REPLACE INTO live_capture_meta (key, value) VALUES ('interface', ?)", (str(selected_interface or ''),))
+        conn.execute("INSERT OR REPLACE INTO live_capture_meta (key, value) VALUES ('started_at', ?)", (str(_started_at),))
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
     # --------------------------------------------------------
     # Capture thread
     # --------------------------------------------------------
@@ -850,6 +995,14 @@ def stop_capture():
 
     _running = False
 
+    try:
+        conn = _get_db()
+        conn.execute("INSERT OR REPLACE INTO live_capture_meta (key, value) VALUES ('running', '0')")
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
     return {
 
         "ok": True,
@@ -865,25 +1018,45 @@ def stop_capture():
 
 def status():
 
+    is_running = _running
+    meta_iface = _current_interface
+    meta_started = _started_at
+    meta_err = _last_error
+    count = len(_packets)
+
+    try:
+        conn = _get_db()
+        rows = dict(conn.execute("SELECT key, value FROM live_capture_meta").fetchall())
+        count = conn.execute("SELECT COUNT(*) FROM live_packet_buffer").fetchone()[0]
+        conn.close()
+        if rows.get("running") == "1":
+            is_running = True
+            meta_iface = rows.get("interface") or meta_iface
+            meta_started = rows.get("started_at") or meta_started
+        elif rows.get("running") == "0":
+            is_running = False
+    except Exception:
+        pass
+
     return {
 
         "available":
             SCAPY_AVAILABLE,
 
         "running":
-            _running,
+            is_running,
 
         "interface":
-            _current_interface,
+            meta_iface,
 
         "error":
-            _last_error,
+            meta_err,
 
         "count":
-            len(_packets),
+            count,
 
         "started_at":
-            _started_at,
+            meta_started,
 
     }
 
@@ -922,6 +1095,27 @@ def get_packets(
         1,
         min(limit, 2000)
     )
+
+    # First attempt to read from shared SQLite buffer
+    try:
+        conn = _get_db()
+        sql = "SELECT * FROM live_packet_buffer WHERE 1=1"
+        params = []
+        if protocol != "ALL":
+            sql += " AND protocol = ?"
+            params.append(protocol)
+        if query:
+            sql += " AND (lower(src) LIKE ? OR lower(dst) LIKE ? OR lower(protocol) LIKE ? OR lower(info) LIKE ? OR lower(payload_preview) LIKE ?)"
+            q_param = f"%{query}%"
+            params.extend([q_param, q_param, q_param, q_param, q_param])
+        sql += " ORDER BY id DESC LIMIT ?"
+        params.append(limit)
+        rows = conn.execute(sql, params).fetchall()
+        conn.close()
+        if rows:
+            return [dict(r) for r in rows]
+    except Exception:
+        pass
 
     with _lock:
 
@@ -1012,6 +1206,15 @@ def get_packet(packet_id):
 
         return None
 
+    try:
+        conn = _get_db()
+        row = conn.execute("SELECT * FROM live_packet_buffer WHERE id = ?", (packet_id,)).fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+    except Exception:
+        pass
+
     with _lock:
 
         for packet in _packets:
@@ -1041,6 +1244,14 @@ def clear_packets():
         _packets.clear()
 
         _sequence = 0
+
+    try:
+        conn = _get_db()
+        conn.execute("DELETE FROM live_packet_buffer")
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
 
     return {
 

@@ -971,13 +971,12 @@
 
 
                     <td>
-
-                        {{ item.response_ms or item.elapsed_ms or '-' }}
-
-                        {% if item.response_ms or item.elapsed_ms %}
-                            ms
+                        {% set resp = item.response_ms if item.response_ms is not none else item.elapsed_ms %}
+                        {% if resp is not none and resp != '-' and resp != '' %}
+                            {{ resp }} ms
+                        {% else %}
+                            -
                         {% endif %}
-
                     </td>
 
 

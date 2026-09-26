@@ -19,6 +19,9 @@ import uuid
 import urllib.parse
 import requests
 import socket
+import io
+import secrets
+from functools import wraps
 
 from werkzeug.security import (
     generate_password_hash,
@@ -26,6 +29,7 @@ from werkzeug.security import (
 )
 
 from werkzeug.utils import secure_filename
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from reportlab.pdfgen import canvas
 
@@ -35,7 +39,10 @@ from reportlab.pdfgen import canvas
 # ============================================================
 
 from modules.log_analysis import analyze_log
-from modules.network_scan import scan_ports
+from modules.network_scan import (
+    scan_ports,
+    resolve_target
+)
 from modules.packet_analysis import (
     analyze_packet,
     analyze_packet_file
@@ -60,10 +67,10 @@ from modules.threat_intel import analyze_threat
 # ============================================================
 
 app = Flask(__name__)
+# Enable reverse-proxy header support for correct client IP detection
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
 # Always load the project's own .env file.
-# This prevents OAuth values from being missed when Flask is started
-# from a different working directory.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 try:
@@ -77,9 +84,30 @@ except Exception:
 # CONFIGURATION
 # ============================================================
 
-app.secret_key = os.getenv(
-    "SECRET_KEY",
-    "p13-change-this-secret"
+# Secure Secret Key: Ensure it's not a predictable default
+_env_secret = os.getenv("SECRET_KEY", "").strip()
+if not _env_secret or _env_secret in ("p13-change-this-secret", "p13-aegis-secure-key-2026-change-this-later", "change-this-secret"):
+    _secret_dir = os.path.join(BASE_DIR, "data")
+    os.makedirs(_secret_dir, exist_ok=True)
+    _secret_file = os.path.join(_secret_dir, "secret_key.bin")
+    if os.path.exists(_secret_file):
+        with open(_secret_file, "rb") as _f:
+            app.secret_key = _f.read()
+    else:
+        app.secret_key = secrets.token_bytes(32)
+        try:
+            with open(_secret_file, "wb") as _f:
+                _f.write(app.secret_key)
+        except Exception:
+            pass
+else:
+    app.secret_key = _env_secret
+
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=datetime.timedelta(hours=8),
+    MAX_CONTENT_LENGTH=32 * 1024 * 1024  # 32 MB max file size
 )
 
 GOOGLE_CLIENT_ID = os.getenv(
@@ -230,9 +258,81 @@ pre, code, .mono, .packet-data, .packet-details,
 """
 
 
+def get_csrf_token():
+    if "_csrf_token" not in session:
+        session["_csrf_token"] = secrets.token_hex(32)
+    return session["_csrf_token"]
+
+
+@app.context_processor
+def inject_template_globals():
+    return {
+        "csrf_token": get_csrf_token(),
+        "google_enabled": google_configured()
+    }
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user" not in session:
+            if request.is_json or request.path.startswith("/api/"):
+                return jsonify({"ok": False, "error": "Authentication required"}), 401
+            return redirect("/")
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user" not in session:
+            return redirect("/")
+        if session.get("role") != "admin":
+            return "Access Denied: Administrator role required", 403
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+ALLOWED_EXTENSIONS = {
+    'log': {'.log', '.txt', '.csv', '.json'},
+    'packet': {'.pcap', '.pcapng', '.cap', '.txt', '.log'},
+    'evidence': {'.pcap', '.pcapng', '.cap', '.log', '.txt', '.csv', '.json', '.png', '.jpg', '.jpeg', '.pdf'}
+}
+
+
+def is_allowed_file(filename, category='evidence'):
+    ext = os.path.splitext(str(filename or "").lower())[1]
+    return ext in ALLOWED_EXTENSIONS.get(category, set())
+
+
+@app.before_request
+def csrf_protect():
+    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+        if request.endpoint in ("login", "signup", "google_login", "google_callback"):
+            return
+
+        expected_token = session.get("_csrf_token")
+        provided_token = request.form.get("csrf_token") or request.headers.get("X-CSRFToken") or request.headers.get("X-CSRF-Token")
+
+        if expected_token and provided_token and secrets.compare_digest(str(expected_token), str(provided_token)):
+            return
+
+        # Safe fallback for same-origin JSON requests from active session
+        if (request.is_json or request.path.startswith("/api/")) and "user" in session:
+            sec_fetch = request.headers.get("Sec-Fetch-Site")
+            if sec_fetch in ("same-origin", "same-site", None):
+                return
+
+        if request.is_json or request.path.startswith("/api/"):
+            return jsonify({"ok": False, "error": "Invalid or missing CSRF token"}), 403
+
+        return render_template("login.html", error="Session expired or invalid form signature. Please try again.", google_enabled=google_configured()), 403
+
+
 @app.after_request
 def inject_readability_css(response):
-    """Inject the global readability CSS into HTML responses only."""
+    """Inject the global readability CSS, CSRF tokens, and security headers into HTML responses only."""
     content_type = (response.content_type or "").lower()
 
     if (
@@ -242,14 +342,28 @@ def inject_readability_css(response):
     ):
         try:
             html = response.get_data(as_text=True)
+            modified = False
             if "</head>" in html.lower() and "aegis-readability" not in html:
                 idx = html.lower().rfind("</head>")
                 html = html[:idx] + READABILITY_CSS + html[idx:]
+                modified = True
+
+            # Auto-inject CSRF token into HTML forms
+            if "<form" in html.lower() and 'name="csrf_token"' not in html:
+                token = get_csrf_token()
+                csrf_tag = f'<input type="hidden" name="csrf_token" value="{token}">'
+                html = re.sub(r'(<form\b[^>]*>)', r'\1' + csrf_tag, html, flags=re.IGNORECASE)
+                modified = True
+
+            if modified:
                 response.set_data(html)
         except Exception:
             # Never let UI enhancement break the actual application response.
             pass
 
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
     return response
 
 
@@ -377,10 +491,15 @@ DB_PATH = os.path.join(BASE_DIR, "users.db")
 def get_db():
 
     conn = sqlite3.connect(
-        DB_PATH
+        DB_PATH,
+        timeout=10.0
     )
 
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode = WAL;")
+    conn.execute("PRAGMA busy_timeout = 5000;")
+    conn.execute("PRAGMA synchronous = NORMAL;")
+    conn.execute("PRAGMA foreign_keys = ON;")
 
     return conn
 
@@ -530,6 +649,49 @@ def init_db():
         )
     """)
 
+    # --------------------------------------------------------
+    # SCALABILITY INDEXES
+    # --------------------------------------------------------
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_users_google ON users(google_id);")
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_incidents_status ON incidents(status);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_incidents_severity ON incidents(severity);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_incidents_code ON incidents(incident_code);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_incidents_created ON incidents(created_at);")
+
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_history_incident_id ON incident_history(incident_id);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_evidence_incident_id ON incident_evidence(incident_id);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(username, is_read);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_threat_logs_ip ON threat_logs(ip);")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_activity_logs_time ON activity_logs(time);")
+
+    # --------------------------------------------------------
+    # SECURE ADMIN SEEDING & PASSWORD HASH UPGRADE
+    # --------------------------------------------------------
+
+    cur.execute("SELECT id, role, password FROM users WHERE LOWER(username) = 'kunal sharma'")
+    admin_row = cur.fetchone()
+    if not admin_row:
+        cur.execute(
+            "INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+            ("kunal sharma", generate_password_hash("sharma@123"), "admin")
+        )
+    else:
+        cur.execute(
+            "UPDATE users SET role = 'admin', password = ? WHERE LOWER(username) = 'kunal sharma'",
+            (generate_password_hash("sharma@123"),)
+        )
+
+    # Migrate any legacy plaintext passwords to secure hashes
+    cur.execute("SELECT id, password FROM users")
+    for u in cur.fetchall():
+        pwd = u["password"]
+        if pwd and not (pwd.startswith("scrypt:") or pwd.startswith("pbkdf2:")):
+            cur.execute("UPDATE users SET password = ? WHERE id = ?", (generate_password_hash(pwd), u["id"]))
+
     conn.commit()
 
     conn.close()
@@ -539,33 +701,27 @@ init_db()
 
 
 # ============================================================
-# DEFAULT ADMIN
-# ============================================================
-
-USER_DATA = {
-
-    "username":
-        "kunal sharma",
-
-    "password":
-        "sharma@123"
-
-}
-
-
-# ============================================================
-# LOGIN SECURITY
+# LOGIN SECURITY & RATE LIMITING
 # ============================================================
 
 login_attempts = {}
 
 lock_time = {}
 
-MAX_ATTEMPTS = 3
+MAX_ATTEMPTS = 5
 
 LOCK_DURATION = 30
 
 activity_log = []
+
+
+def clean_rate_limits():
+    """Prune expired lockouts and stale attempt counters to prevent memory leaks."""
+    now_ts = time.time()
+    expired = [ip for ip, expiry in lock_time.items() if now_ts >= expiry]
+    for ip in expired:
+        lock_time.pop(ip, None)
+        login_attempts.pop(ip, None)
 
 
 # ============================================================
@@ -1049,6 +1205,8 @@ def get_incident_stats():
 )
 def login():
 
+    clean_rate_limits()
+
     ip = (
         request.remote_addr
         or "unknown"
@@ -1067,17 +1225,13 @@ def login():
     if time.time() < lock_time[ip]:
 
         return render_template(
-
             "login.html",
-
             error=(
                 "Too many attempts. "
                 "Try later."
             ),
-
             google_enabled=
                 google_configured()
-
         )
 
     if request.method == "POST":
@@ -1095,65 +1249,46 @@ def login():
         conn = get_db()
 
         user = conn.execute(
-
             """
             SELECT *
             FROM users
-            WHERE username=?
+            WHERE LOWER(username)=LOWER(?)
             """,
-
             (name,)
-
         ).fetchone()
 
-        conn.close()
+        authenticated = False
+        if user:
+            stored_pwd = user["password"]
+            if stored_pwd and (stored_pwd.startswith("scrypt:") or stored_pwd.startswith("pbkdf2:")):
+                authenticated = check_password_hash(stored_pwd, password)
+            elif stored_pwd and stored_pwd == password:
+                authenticated = True
+                try:
+                    conn.execute(
+                        "UPDATE users SET password=? WHERE id=?",
+                        (generate_password_hash(password), user["id"])
+                    )
+                    conn.commit()
+                except Exception:
+                    pass
 
-        if (
-            user
-            and check_password_hash(
-                user[2],
-                password
-            )
-        ):
-
-            session["user"] = name
-
-            session["role"] = user[3]
-
+        if authenticated:
+            session["user"] = user["username"]
+            session["role"] = user["role"] if user["role"] else "user"
             login_attempts[ip] = 0
+            clean_rate_limits()
+            conn.close()
 
             log_activity(
-                f"{name} login"
+                f"{session['user']} login"
             )
 
             return redirect(
                 "/dashboard"
             )
-
-        elif (
-            name
-            == USER_DATA["username"]
-            and
-            password
-            == USER_DATA["password"]
-        ):
-
-            session["user"] = name
-
-            session["role"] = "admin"
-
-            login_attempts[ip] = 0
-
-            log_activity(
-                "Admin login"
-            )
-
-            return redirect(
-                "/dashboard"
-            )
-
         else:
-
+            conn.close()
             login_attempts[ip] += 1
 
             if (
@@ -1167,37 +1302,26 @@ def login():
                 )
 
                 return render_template(
-
                     "login.html",
-
                     error=(
                         "Account locked "
                         "for 30 seconds"
                     ),
-
                     google_enabled=
                         google_configured()
-
                 )
 
             return render_template(
-
                 "login.html",
-
                 error="Invalid login",
-
                 google_enabled=
                     google_configured()
-
             )
 
     return render_template(
-
         "login.html",
-
         google_enabled=
             google_configured()
-
     )
 
 
@@ -1563,17 +1687,15 @@ def signup():
 
 
 # ============================================================
+# ============================================================
 # DASHBOARD
 # ============================================================
 
 @app.route(
     "/dashboard"
 )
+@login_required
 def dashboard():
-
-    if "user" not in session:
-
-        return redirect("/")
 
     stats = get_incident_stats()
 
@@ -1620,11 +1742,8 @@ def dashboard():
 @app.route(
     "/incidents"
 )
+@login_required
 def incidents():
-
-    if "user" not in session:
-
-        return redirect("/")
 
     status = request.args.get(
         "status",
@@ -1705,11 +1824,8 @@ def incidents():
     "/incident/create",
     methods=["GET", "POST"]
 )
+@login_required
 def incident_create():
-
-    if "user" not in session:
-
-        return redirect("/")
 
     if request.method == "POST":
 
@@ -1816,13 +1932,10 @@ def incident_create():
 @app.route(
     "/incident/<int:incident_id>"
 )
+@login_required
 def incident_detail(
     incident_id
 ):
-
-    if "user" not in session:
-
-        return redirect("/")
 
     incident, history, evidence = (
         get_incident(
@@ -1871,13 +1984,10 @@ def incident_detail(
     "/incident/<int:incident_id>/update",
     methods=["POST"]
 )
+@login_required
 def incident_update(
     incident_id
 ):
-
-    if "user" not in session:
-
-        return redirect("/")
 
     incident, _, _ = get_incident(
         incident_id
@@ -2113,13 +2223,10 @@ def incident_update(
     "/incident/<int:incident_id>/evidence",
     methods=["POST"]
 )
+@login_required
 def incident_evidence(
     incident_id
 ):
-
-    if "user" not in session:
-
-        return redirect("/")
 
     incident, _, _ = get_incident(
         incident_id
@@ -2148,6 +2255,9 @@ def incident_evidence(
     sha256 = None
 
     if upload and upload.filename:
+
+        if not is_allowed_file(upload.filename, "evidence"):
+            return "File type not allowed for evidence upload", 400
 
         safe_name = secure_filename(
             upload.filename
@@ -2276,13 +2386,10 @@ def incident_evidence(
 @app.route(
     "/incident/<int:incident_id>/report"
 )
+@login_required
 def incident_report(
     incident_id
 ):
-
-    if "user" not in session:
-
-        return redirect("/")
 
     incident, history, evidence = (
         get_incident(
@@ -2294,16 +2401,10 @@ def incident_report(
 
         return "Incident not found", 404
 
-    filename = os.path.join(
-
-        UPLOAD_FOLDER,
-
-        f"{incident['incident_code']}_report.pdf"
-
-    )
+    buffer = io.BytesIO()
 
     c = canvas.Canvas(
-        filename
+        buffer
     )
 
     y = 800
@@ -2492,9 +2593,13 @@ def incident_report(
 
     c.save()
 
+    buffer.seek(0)
+
     return send_file(
-        filename,
-        as_attachment=True
+        buffer,
+        as_attachment=True,
+        download_name=f"{incident['incident_code']}_report.pdf",
+        mimetype="application/pdf"
     )
 
 
@@ -2505,6 +2610,8 @@ def incident_report(
 @app.route(
     "/admin"
 )
+@login_required
+@admin_required
 def admin():
 
     if session.get(
@@ -2582,6 +2689,7 @@ def admin():
     "/log",
     methods=["POST"]
 )
+@login_required
 def log_route():
 
     file = request.files.get(
@@ -2598,9 +2706,24 @@ def log_route():
             "/dashboard"
         )
 
-    filename = secure_filename(
-        file.filename
-    )
+    if not is_allowed_file(file.filename, "log"):
+        return render_template(
+            "result.html",
+            title="Log Analysis Error",
+            data={"error": "Invalid file extension. Allowed extensions: .log, .txt, .csv, .json"},
+            summary={
+                "Open Ports": 0,
+                "Closed Ports": 0,
+                "Total Alerts": 0,
+                "Risk": "Low"
+            },
+            lat=20,
+            lon=78,
+            alert=True,
+            incident_id=None
+        ), 400
+
+    filename = f"{uuid.uuid4().hex[:8]}_{secure_filename(file.filename)}"
 
     path = os.path.join(
         UPLOAD_FOLDER,
@@ -2714,6 +2837,7 @@ def log_route():
     "/network",
     methods=["POST"]
 )
+@login_required
 def network():
 
     ip = request.form.get(
@@ -2816,10 +2940,8 @@ def network():
     "/triage",
     methods=["GET", "POST"]
 )
+@login_required
 def triage():
-
-    if "user" not in session:
-        return redirect("/")
 
     if request.method == "GET":
         return render_template("triage.html")
@@ -2845,16 +2967,16 @@ def triage():
     }:
         lab_profile = "Metasploitable2"
 
-    # Resolve target.
-    try:
-        resolved_ip = socket.gethostbyname(target)
-    except Exception:
+    # Resolve target with SSRF protection.
+    target_info = resolve_target(target)
+    if not target_info.get("ok"):
         return render_template(
             "triage.html",
-            error=f"Unable to resolve target: {target}",
+            error=target_info.get("error", "Unable to resolve or validate target"),
             target=target,
             lab_profile=lab_profile
         )
+    resolved_ip = target_info["ip"]
 
     # ------------------------------------------------------------
     # Seven-port TCP scan
@@ -3144,6 +3266,7 @@ def triage():
     "/packet",
     methods=["POST"]
 )
+@login_required
 def packet():
 
     file = request.files.get(
@@ -3156,9 +3279,24 @@ def packet():
         file.filename
     ):
 
-        filename = secure_filename(
-            file.filename
-        )
+        if not is_allowed_file(file.filename, "packet"):
+            return render_template(
+                "result.html",
+                title="Packet Analysis Error",
+                data=["⚠ Error: Invalid packet file extension. Allowed extensions: .pcap, .pcapng, .cap, .log, .txt"],
+                summary={
+                    "Open Ports": 0,
+                    "Closed Ports": 0,
+                    "Total Alerts": 1,
+                    "Risk": "Low"
+                },
+                lat=20,
+                lon=78,
+                alert=True,
+                incident_id=None
+            ), 400
+
+        filename = f"{uuid.uuid4().hex[:8]}_{secure_filename(file.filename)}"
 
         path = os.path.join(
             UPLOAD_FOLDER,
@@ -3289,6 +3427,7 @@ def packet():
     "/threat",
     methods=["POST"]
 )
+@login_required
 def threat():
 
     target_url = request.form.get(
@@ -3405,11 +3544,8 @@ def threat():
 @app.route(
     "/live"
 )
+@login_required
 def live():
-
-    if "user" not in session:
-
-        return redirect("/")
 
     return render_template(
 
@@ -3432,19 +3568,8 @@ def live():
     "/api/live/start",
     methods=["POST"]
 )
+@login_required
 def api_live_start():
-
-    if "user" not in session:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Authentication required"
-
-        }), 401
 
     data = (
         request.get_json(
@@ -3484,19 +3609,8 @@ def api_live_start():
     "/api/live/stop",
     methods=["POST"]
 )
+@login_required
 def api_live_stop():
-
-    if "user" not in session:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Authentication required"
-
-        }), 401
 
     result = stop_capture()
 
@@ -3516,19 +3630,8 @@ def api_live_stop():
 @app.route(
     "/api/live/status"
 )
+@login_required
 def api_live_status():
-
-    if "user" not in session:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Authentication required"
-
-        }), 401
 
     return jsonify(
         live_status()
@@ -3542,19 +3645,8 @@ def api_live_status():
 @app.route(
     "/api/live/packets"
 )
+@login_required
 def api_live_packets():
-
-    if "user" not in session:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Authentication required"
-
-        }), 401
 
     packets = get_packets(
 
@@ -3643,21 +3735,10 @@ def api_live_packets():
 @app.route(
     "/api/live/packet/<int:packet_id>"
 )
+@login_required
 def api_live_packet(
     packet_id
 ):
-
-    if "user" not in session:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Authentication required"
-
-        }), 401
 
     packet = get_packet(
         packet_id
@@ -3685,19 +3766,8 @@ def api_live_packet(
     "/api/live/clear",
     methods=["POST"]
 )
+@login_required
 def api_live_clear():
-
-    if "user" not in session:
-
-        return jsonify({
-
-            "ok":
-                False,
-
-            "error":
-                "Authentication required"
-
-        }), 401
 
     result = clear_packets()
 
@@ -3718,6 +3788,7 @@ def api_live_clear():
     "/api/live/promote",
     methods=["POST"]
 )
+@login_required
 def api_live_promote():
 
     if "user" not in session:
@@ -3858,6 +3929,7 @@ def api_live_promote():
 @app.route(
     "/simulate/<attack>"
 )
+@login_required
 def simulate_attack(
     attack
 ):
@@ -3954,6 +4026,7 @@ def simulate_attack(
 @app.route(
     "/ai_assistant"
 )
+@login_required
 def ai_assistant():
 
     advice = [
@@ -3991,12 +4064,13 @@ def ai_assistant():
 @app.route(
     "/download_report"
 )
+@login_required
 def download_report():
 
-    filename = "report.pdf"
+    buffer = io.BytesIO()
 
     c = canvas.Canvas(
-        filename
+        buffer
     )
 
     c.drawString(
@@ -4053,12 +4127,13 @@ def download_report():
 
     c.save()
 
+    buffer.seek(0)
+
     return send_file(
-
-        filename,
-
-        as_attachment=True
-
+        buffer,
+        as_attachment=True,
+        download_name=f"p13_cyber_report_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf",
+        mimetype="application/pdf"
     )
 
 

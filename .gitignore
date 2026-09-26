@@ -6,6 +6,10 @@ __pycache__/
 *.db-journal
 *.sqlite-wal
 *.sqlite-shm
+*.db-wal
+*.db-shm
+data/*.bin
 *.log
 logs/evidence/*
 reports/generated/*
+
