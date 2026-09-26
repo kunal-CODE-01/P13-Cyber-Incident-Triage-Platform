@@ -1,0 +1,1628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+
+<title>AEGIS // Live Packet Monitor</title>
+
+<link rel="stylesheet" href="/static/p13.css">
+
+<style>
+.packet-table tbody tr{
+    cursor:pointer;
+}
+
+.packet-table tbody tr:hover{
+    background:#091b2a;
+}
+
+.packet-table tbody tr.selected{
+    background:#102c40;
+    outline:1px solid #1e668c;
+}
+
+.capture-dot{
+    display:inline-block;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:#536579;
+    margin-right:7px;
+}
+
+.capture-dot.on{
+    background:#50e3a4;
+    box-shadow:0 0 9px #50e3a4;
+}
+
+.live-help{
+    color:#526d86;
+    font-size:11px;
+}
+
+.packet-btn.active{
+    border-color:#277da8;
+    color:#8ddcff;
+}
+
+.packet-table td{
+    white-space:nowrap;
+}
+
+.packet-table td:last-child{
+    white-space:normal;
+    min-width:260px;
+}
+
+.packet-detail-grid{
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px 18px;
+}
+
+.packet-detail-grid span{
+    color:#6d849a;
+}
+
+@media(max-width:900px){
+    .packet-detail-grid{
+        grid-template-columns:1fr;
+    }
+
+    .packet-table-wrap{
+        overflow:auto;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="shell">
+
+<!-- ================= SIDEBAR ================= -->
+
+<aside class="sidebar">
+
+    <div class="brand">
+        <div class="brandmark">AG</div>
+
+        <div>
+            <strong>AEGIS SOC</strong>
+            <span>P13 INCIDENT RESPONSE</span>
+        </div>
+    </div>
+
+    <div class="nav-title">Command</div>
+
+    <nav class="nav">
+
+        <a href="/dashboard">
+            <i class="ico">⌂</i>
+            <span>Command Center</span>
+        </a>
+
+        <a href="/incidents">
+            <i class="ico">◈</i>
+            <span>Incident Queue</span>
+        </a>
+
+        <a class="active" href="/live">
+            <i class="ico">◉</i>
+            <span>Live Packet Monitor</span>
+        </a>
+
+        <a href="/incident/create">
+            <i class="ico">＋</i>
+            <span>Report Incident</span>
+        </a>
+
+    </nav>
+
+    <div class="nav-title">Security Operations</div>
+
+    <nav class="nav">
+
+        <a href="/triage">
+            <i class="ico">⌁</i>
+            <span>Incident Triage</span>
+        </a>
+
+        <a href="/dashboard#detectors">
+            <i class="ico">◎</i>
+            <span>Detection Arsenal</span>
+        </a>
+
+        <a href="/dashboard#analytics">
+            <i class="ico">▥</i>
+            <span>Analytics</span>
+        </a>
+
+        <a href="/admin">
+            <i class="ico">⚙</i>
+            <span>Admin Console</span>
+        </a>
+
+    </nav>
+
+    <div class="sidebar-bottom">
+
+        <div class="user-mini">
+
+            <span class="dot"></span>
+
+            <b style="font-size:10px">
+                {{ session.get('user') }}
+            </b>
+
+            <div style="color:#63718a;font-size:8px;margin-top:4px">
+                {{ session.get('role','user')|upper }} • LIVE SESSION
+            </div>
+
+        </div>
+
+        <a
+            class="btn full danger"
+            style="margin-top:8px"
+            href="/logout"
+        >
+            Logout
+        </a>
+
+    </div>
+
+</aside>
+
+
+<!-- ================= MAIN ================= -->
+
+<main class="main">
+
+    <!-- TOP BAR -->
+
+    <div class="topbar">
+
+        <div class="crumb">
+            <b>SOC / NETWORK</b>
+            <span>›</span>
+            LIVE PACKET MONITOR
+        </div>
+
+        <div class="top-actions">
+
+            <span class="pill" id="topStatus">
+                CAPTURE OFFLINE
+            </span>
+
+            <a class="btn" href="/dashboard">
+                Command Center
+            </a>
+
+        </div>
+
+    </div>
+
+
+    <!-- PAGE TITLE -->
+
+    <div class="page-title">
+
+        <div>
+
+            <div class="eyebrow">
+                Network Visibility • Passive Monitoring
+            </div>
+
+            <h1>
+                Live Packet Monitor
+            </h1>
+
+            <p>
+                Real Scapy traffic capture with Wireshark-style
+                inspection and P13 incident handoff.
+            </p>
+
+        </div>
+
+    </div>
+
+
+    <!-- ================= KPI ================= -->
+
+    <div class="live-kpis" style="margin:14px 0">
+
+        <div class="live-kpi">
+            <span>Packets Visible</span>
+            <b id="kTotal">0</b>
+        </div>
+
+        <div class="live-kpi">
+            <span>TCP</span>
+            <b id="kTcp">0</b>
+        </div>
+
+        <div class="live-kpi">
+            <span>UDP</span>
+            <b id="kUdp">0</b>
+        </div>
+
+        <div class="live-kpi">
+            <span>ICMP</span>
+            <b id="kIcmp">0</b>
+        </div>
+
+        <div class="live-kpi">
+            <span>ARP</span>
+            <b id="kArp">0</b>
+        </div>
+
+        <div class="live-kpi alert">
+            <span>Risk Alerts</span>
+            <b id="kAlerts">0</b>
+        </div>
+
+    </div>
+
+
+    <!-- ================= PACKET CONSOLE ================= -->
+
+    <section class="packet-console">
+
+        <!-- TOOLBAR -->
+
+        <div class="packet-toolbar">
+
+            <span
+                class="capture-dot"
+                id="captureDot">
+            </span>
+
+            <span
+                class="capture-status"
+                id="captureText">
+                CAPTURE STOPPED
+            </span>
+
+
+            <!-- INTERFACE -->
+
+            <select
+                class="select interface-select"
+                id="iface"
+            >
+
+                <option value="">
+                    Default network interface
+                </option>
+
+                {% for iface in interfaces %}
+
+                <option value="{{ iface }}">
+                    {{ iface }}
+                </option>
+
+                {% endfor %}
+
+            </select>
+
+
+            <!-- START -->
+
+            <button
+                class="packet-btn"
+                id="startBtn"
+                onclick="startCapture()"
+            >
+                ▶ START
+            </button>
+
+
+            <!-- STOP -->
+
+            <button
+                class="packet-btn"
+                id="stopBtn"
+                onclick="stopCapture()"
+            >
+                ■ STOP
+            </button>
+
+
+            <!-- CLEAR -->
+
+            <button
+                class="packet-btn"
+                onclick="clearView()"
+            >
+                ⌫ CLEAR
+            </button>
+
+
+            <!-- SEARCH -->
+
+            <input
+                class="packet-filter"
+                id="filter"
+                placeholder="Search: IP, TCP, 443, HIGH, payload..."
+                oninput="scheduleRefresh()"
+            >
+
+        </div>
+
+
+        <!-- PROTOCOL FILTER -->
+
+        <div
+            style="
+                display:flex;
+                gap:6px;
+                padding:8px 10px;
+                border-bottom:1px solid #10283d;
+                background:#040c14;
+                flex-wrap:wrap
+            "
+        >
+
+            <button
+                class="packet-btn active"
+                data-proto="ALL"
+                onclick="setProto('ALL',this)"
+            >
+                ALL
+            </button>
+
+            <button
+                class="packet-btn"
+                data-proto="TCP"
+                onclick="setProto('TCP',this)"
+            >
+                TCP
+            </button>
+
+            <button
+                class="packet-btn"
+                data-proto="UDP"
+                onclick="setProto('UDP',this)"
+            >
+                UDP
+            </button>
+
+            <button
+                class="packet-btn"
+                data-proto="ICMP"
+                onclick="setProto('ICMP',this)"
+            >
+                ICMP
+            </button>
+
+            <button
+                class="packet-btn"
+                data-proto="ARP"
+                onclick="setProto('ARP',this)"
+            >
+                ARP
+            </button>
+
+            <span
+                style="margin-left:auto"
+                class="live-help"
+            >
+                Authorized monitoring only •
+                Scapy/Npcap required
+            </span>
+
+        </div>
+
+
+        <!-- ================= PACKET TABLE ================= -->
+
+        <div
+            class="packet-table-wrap"
+            id="packetTableWrap"
+        >
+
+            <table class="packet-table">
+
+                <thead>
+
+                    <tr>
+
+                        <th>No.</th>
+                        <th>Time</th>
+                        <th>Source</th>
+                        <th>Destination</th>
+                        <th>Protocol</th>
+                        <th>Src Port</th>
+                        <th>Dst Port</th>
+                        <th>Length</th>
+                        <th>Flags</th>
+                        <th>Info / Risk</th>
+
+                    </tr>
+
+                </thead>
+
+                <tbody id="packetRows">
+
+                    <tr>
+
+                        <td
+                            colspan="10"
+                            style="
+                                text-align:center;
+                                padding:55px;
+                                color:#48647d
+                            "
+                        >
+                            Press START to begin live packet capture.
+                        </td>
+
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+
+        <!-- ================= PACKET INSPECTOR ================= -->
+
+        <div class="packet-bottom">
+
+            <div
+                class="packet-tree"
+                id="packetDetail"
+            >
+
+                <b>
+                    Packet Inspector
+                </b>
+
+                <br>
+
+                Click a captured packet to inspect its metadata.
+
+                <br><br>
+
+                <span style="color:#3f5d76">
+                    Ethernet → IPv4 →
+                    TCP/UDP/ICMP →
+                    payload metadata
+                </span>
+
+            </div>
+
+
+            <!-- HEX -->
+
+            <div
+                class="packet-hex"
+                id="packetHex"
+            >
+
+                <div class="hex-line">
+
+                    <span class="hex-offset">
+                        0000
+                    </span>
+
+                    <span class="hex-bytes">
+                        No packet selected
+                    </span>
+
+                    <span class="hex-ascii">
+                        AEGIS
+                    </span>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- ================= INCIDENT ================= -->
+
+    <div
+        style="
+            display:flex;
+            gap:8px;
+            align-items:center;
+            justify-content:space-between;
+            margin-top:10px;
+            flex-wrap:wrap
+        "
+    >
+
+        <div class="live-help">
+
+            Select a suspicious packet and
+            promote it into the P13 incident lifecycle.
+
+        </div>
+
+
+        <button
+            class="btn primary"
+            id="promoteBtn"
+            disabled
+            onclick="promoteSelected()"
+        >
+            🚨 CREATE P13 INCIDENT
+            FROM SELECTED PACKET
+        </button>
+
+    </div>
+
+
+    <!-- ================= WORKFLOW ================= -->
+
+    <section
+        class="card"
+        style="margin-top:14px;padding:15px"
+    >
+
+        <div class="section-head">
+
+            <h2>
+                Monitoring Workflow
+            </h2>
+
+            <span>
+                AEGIS → P13
+            </span>
+
+        </div>
+
+
+        <div class="workflow">
+
+            <div class="workflow-step done">
+
+                <span class="num">
+                    01
+                </span>
+
+                <b>
+                    Capture
+                </b>
+
+                <span>
+                    Interface
+                </span>
+
+            </div>
+
+
+            <div class="workflow-step active">
+
+                <span class="num">
+                    02
+                </span>
+
+                <b>
+                    Inspect
+                </b>
+
+                <span>
+                    Packet fields
+                </span>
+
+            </div>
+
+
+            <div class="workflow-step">
+
+                <span class="num">
+                    03
+                </span>
+
+                <b>
+                    Detect
+                </b>
+
+                <span>
+                    Risk indicators
+                </span>
+
+            </div>
+
+
+            <div class="workflow-step">
+
+                <span class="num">
+                    04
+                </span>
+
+                <b>
+                    Promote
+                </b>
+
+                <span>
+                    Create incident
+                </span>
+
+            </div>
+
+
+            <div class="workflow-step">
+
+                <span class="num">
+                    05
+                </span>
+
+                <b>
+                    Investigate
+                </b>
+
+                <span>
+                    Evidence + notes
+                </span>
+
+            </div>
+
+
+            <div class="workflow-step">
+
+                <span class="num">
+                    06
+                </span>
+
+                <b>
+                    Resolve
+                </b>
+
+                <span>
+                    Audit trail
+                </span>
+
+            </div>
+
+        </div>
+
+    </section>
+
+</main>
+
+</div>
+
+
+<!-- ================= JAVASCRIPT ================= -->
+
+<script>
+
+let proto = 'ALL';
+
+let timer = null;
+
+let selected = null;
+
+
+const $ = id =>
+    document.getElementById(id);
+
+
+/* ============================================
+   HTML ESCAPE
+============================================ */
+
+function esc(value){
+
+    return String(value ?? '')
+        .replace(/[&<>"']/g, function(c){
+
+            return {
+
+                '&':'&amp;',
+                '<':'&lt;',
+                '>':'&gt;',
+                '"':'&quot;',
+                "'":'&#039;'
+
+            }[c];
+
+        });
+
+}
+
+
+/* ============================================
+   PROTOCOL FILTER
+============================================ */
+
+function setProto(protocol, element){
+
+    proto = protocol;
+
+    document
+        .querySelectorAll('[data-proto]')
+        .forEach(function(button){
+
+            button.classList.remove('active');
+
+        });
+
+    element.classList.add('active');
+
+    refresh();
+
+}
+
+
+/* ============================================
+   SEARCH DEBOUNCE
+============================================ */
+
+function scheduleRefresh(){
+
+    clearTimeout(timer);
+
+    timer = setTimeout(
+        refresh,
+        180
+    );
+
+}
+
+
+/* ============================================
+   START CAPTURE
+============================================ */
+
+async function startCapture(){
+
+    const button =
+        $('startBtn');
+
+    button.disabled = true;
+
+    try{
+
+        const response =
+            await fetch(
+                '/api/live/start',
+                {
+                    method:'POST',
+
+                    headers:{
+                        'Content-Type':
+                            'application/json'
+                    },
+
+                    body:JSON.stringify({
+                        interface:
+                            $('iface').value
+                    })
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if(!data.ok){
+
+            alert(
+                data.error ||
+                'Unable to start capture'
+            );
+
+            return;
+
+        }
+
+
+        updateStatus(data);
+
+        refresh();
+
+    }
+
+    catch(error){
+
+        console.error(error);
+
+        alert(
+            'Live capture API is unavailable.'
+        );
+
+    }
+
+    finally{
+
+        button.disabled = false;
+
+    }
+
+}
+
+
+/* ============================================
+   STOP CAPTURE
+============================================ */
+
+async function stopCapture(){
+
+    try{
+
+        const response =
+            await fetch(
+                '/api/live/stop',
+                {
+                    method:'POST'
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        updateStatus(data);
+
+    }
+
+    catch(error){
+
+        console.error(error);
+
+        alert(
+            'Unable to stop capture.'
+        );
+
+    }
+
+}
+
+
+/* ============================================
+   UPDATE STATUS
+============================================ */
+
+function updateStatus(status){
+
+    const running =
+        !!status.running;
+
+
+    $('captureDot')
+        .classList
+        .toggle(
+            'on',
+            running
+        );
+
+
+    $('captureText')
+        .textContent =
+            running
+            ? 'CAPTURE LIVE'
+            : 'CAPTURE STOPPED';
+
+
+    $('topStatus')
+        .textContent =
+            running
+            ? '● LIVE CAPTURE'
+            : 'CAPTURE OFFLINE';
+
+
+    $('topStatus')
+        .classList
+        .toggle(
+            'live',
+            running
+        );
+
+}
+
+
+/* ============================================
+   CLEAR SERVER BUFFER
+============================================ */
+
+async function clearView(){
+
+    selected = null;
+
+    $('promoteBtn')
+        .disabled = true;
+
+
+    try{
+
+        const response =
+            await fetch(
+                '/api/live/clear',
+                {
+                    method:'POST'
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if(!data.ok){
+
+            throw new Error(
+                data.error ||
+                'Clear failed'
+            );
+
+        }
+
+    }
+
+    catch(error){
+
+        console.error(error);
+
+    }
+
+
+    $('packetRows').innerHTML = `
+
+        <tr>
+
+            <td
+                colspan="10"
+                style="
+                    text-align:center;
+                    padding:55px;
+                    color:#48647d
+                "
+            >
+                Capture buffer cleared.
+                Capture may continue.
+            </td>
+
+        </tr>
+
+    `;
+
+
+    $('packetDetail').innerHTML = `
+
+        <b>
+            Packet Inspector
+        </b>
+
+        <br>
+
+        No packet selected.
+
+    `;
+
+
+    $('packetHex').innerHTML = `
+
+        <div class="hex-line">
+
+            <span class="hex-offset">
+                0000
+            </span>
+
+            <span class="hex-bytes">
+                No packet selected
+            </span>
+
+            <span class="hex-ascii">
+                AEGIS
+            </span>
+
+        </div>
+
+    `;
+
+
+    refresh();
+
+}
+
+
+/* ============================================
+   GET LIVE PACKETS
+============================================ */
+
+async function refresh(){
+
+    try{
+
+        const search =
+            encodeURIComponent(
+                $('filter').value
+            );
+
+
+        const response =
+            await fetch(
+                `/api/live/packets?limit=500&protocol=${encodeURIComponent(proto)}&q=${search}`
+            );
+
+
+        if(!response.ok){
+
+            return;
+
+        }
+
+
+        const data =
+            await response.json();
+
+
+        updateStatus(
+            data.status || {}
+        );
+
+
+        const stats =
+            data.stats || {};
+
+
+        $('kTotal')
+            .textContent =
+                stats.total ?? 0;
+
+
+        $('kTcp')
+            .textContent =
+                stats.tcp ?? 0;
+
+
+        $('kUdp')
+            .textContent =
+                stats.udp ?? 0;
+
+
+        $('kIcmp')
+            .textContent =
+                stats.icmp ?? 0;
+
+
+        $('kArp')
+            .textContent =
+                stats.arp ?? 0;
+
+
+        $('kAlerts')
+            .textContent =
+                stats.alerts ?? 0;
+
+
+        renderPackets(
+            data.packets || []
+        );
+
+    }
+
+    catch(error){
+
+        console.debug(
+            'Packet refresh:',
+            error
+        );
+
+    }
+
+}
+
+
+/* ============================================
+   RENDER PACKETS
+============================================ */
+
+function renderPackets(list){
+
+    const tbody =
+        $('packetRows');
+
+
+    if(!list.length){
+
+        tbody.innerHTML = `
+
+            <tr>
+
+                <td
+                    colspan="10"
+                    style="
+                        text-align:center;
+                        padding:55px;
+                        color:#48647d
+                    "
+                >
+                    No packets match the current filter.
+                </td>
+
+            </tr>
+
+        `;
+
+        return;
+
+    }
+
+
+    tbody.innerHTML =
+        list.map(function(packet){
+
+            const risk =
+                String(
+                    packet.risk ||
+                    'NORMAL'
+                ).toUpperCase();
+
+
+            let riskHTML;
+
+
+            if(risk !== 'NORMAL'){
+
+                riskHTML = `
+
+                    <span
+                        class="badge sev-${
+                            risk === 'HIGH'
+                            ? 'critical'
+                            : 'high'
+                        }"
+                    >
+                        ${esc(risk)}
+                    </span>
+
+                `;
+
+            }
+
+            else{
+
+                riskHTML = `
+
+                    <span class="badge sev-low">
+                        NORMAL
+                    </span>
+
+                `;
+
+            }
+
+
+            return `
+
+                <tr
+                    class="
+                        risk-${esc(
+                            risk.toLowerCase()
+                        )}
+                        ${
+                            selected === packet.id
+                            ? 'selected'
+                            : ''
+                        }
+                    "
+                    onclick="
+                        selectPacket(${Number(packet.id)})
+                    "
+                >
+
+                    <td>
+                        ${esc(packet.id)}
+                    </td>
+
+                    <td>
+                        ${esc(packet.time)}
+                    </td>
+
+                    <td>
+                        ${esc(packet.src)}
+                    </td>
+
+                    <td>
+                        ${esc(packet.dst)}
+                    </td>
+
+                    <td
+                        class="
+                            proto
+                            proto-${esc(
+                                String(
+                                    packet.protocol || ''
+                                ).toLowerCase()
+                            )}
+                        "
+                    >
+                        ${esc(packet.protocol)}
+                    </td>
+
+                    <td>
+                        ${esc(packet.sport)}
+                    </td>
+
+                    <td>
+                        ${esc(packet.dport)}
+                    </td>
+
+                    <td>
+                        ${esc(packet.length)}
+                    </td>
+
+                    <td>
+                        ${esc(packet.flags)}
+                    </td>
+
+                    <td>
+
+                        ${riskHTML}
+
+                        <span
+                            style="
+                                color:#526d86;
+                                margin-left:5px
+                            "
+                        >
+                            ${esc(packet.info)}
+                        </span>
+
+                    </td>
+
+                </tr>
+
+            `;
+
+        }).join('');
+
+}
+
+
+/* ============================================
+   SELECT PACKET
+============================================ */
+
+async function selectPacket(id){
+
+    selected = id;
+
+
+    try{
+
+        const response =
+            await fetch(
+                '/api/live/packet/' +
+                encodeURIComponent(id)
+            );
+
+
+        const packet =
+            await response.json();
+
+
+        if(
+            !packet ||
+            !packet.id
+        ){
+
+            selected = null;
+
+            $('promoteBtn')
+                .disabled = true;
+
+            return;
+
+        }
+
+
+        $('promoteBtn')
+            .disabled = false;
+
+
+        $('packetDetail').innerHTML = `
+
+            <b>
+                Frame ${esc(packet.id)}
+            </b>
+
+
+            <div
+                class="packet-detail-grid"
+                style="margin-top:12px"
+            >
+
+                <div>
+                    <span>Time</span>
+                    <br>
+                    ${esc(packet.time)}
+                </div>
+
+
+                <div>
+                    <span>Protocol</span>
+                    <br>
+                    ${esc(packet.protocol)}
+                </div>
+
+
+                <div>
+                    <span>Source</span>
+                    <br>
+                    ${esc(packet.src)}
+                </div>
+
+
+                <div>
+                    <span>Destination</span>
+                    <br>
+                    ${esc(packet.dst)}
+                </div>
+
+
+                <div>
+                    <span>Source Port</span>
+                    <br>
+                    ${esc(packet.sport)}
+                </div>
+
+
+                <div>
+                    <span>Destination Port</span>
+                    <br>
+                    ${esc(packet.dport)}
+                </div>
+
+
+                <div>
+                    <span>Length</span>
+                    <br>
+                    ${esc(packet.length)} bytes
+                </div>
+
+
+                <div>
+                    <span>TTL</span>
+                    <br>
+                    ${esc(packet.ttl)}
+                </div>
+
+
+                <div>
+                    <span>Source MAC</span>
+                    <br>
+                    ${esc(packet.src_mac)}
+                </div>
+
+
+                <div>
+                    <span>Destination MAC</span>
+                    <br>
+                    ${esc(packet.dst_mac)}
+                </div>
+
+
+                <div>
+                    <span>Flags</span>
+                    <br>
+                    ${esc(packet.flags)}
+                </div>
+
+
+                <div>
+                    <span>Risk</span>
+                    <br>
+                    ${esc(packet.risk)}
+                </div>
+
+            </div>
+
+
+            <div style="margin-top:12px">
+
+                <span style="color:#6d849a">
+                    Info
+                </span>
+
+                <br>
+
+                ${esc(packet.info)}
+
+            </div>
+
+
+            <div style="margin-top:8px">
+
+                <span style="color:#6d849a">
+                    Payload length
+                </span>
+
+                ${esc(packet.payload_length)}
+                bytes
+
+            </div>
+
+
+            ${
+                packet.payload_preview
+                ?
+                `
+                <div style="margin-top:8px">
+
+                    <span style="color:#6d849a">
+                        Payload preview
+                    </span>
+
+                    <br>
+
+                    <code>
+                        ${esc(
+                            packet.payload_preview
+                        )}
+                    </code>
+
+                </div>
+                `
+                :
+                ''
+            }
+
+        `;
+
+
+        /* REAL HEX DATA FROM SCAPY */
+
+        const hex =
+            packet.hex_preview || '';
+
+
+        $('packetHex').innerHTML = `
+
+            <div class="hex-line">
+
+                <span class="hex-offset">
+                    0000
+                </span>
+
+                <span class="hex-bytes">
+                    ${esc(
+                        hex ||
+                        'No raw bytes available'
+                    )}
+                </span>
+
+                <span class="hex-ascii">
+                    ${esc(
+                        packet.protocol ||
+                        'AEGIS'
+                    )}
+                </span>
+
+            </div>
+
+
+            <div
+                style="
+                    margin-top:10px;
+                    color:#38536c
+                "
+            >
+                Raw preview supplied by the
+                Scapy capture engine.
+            </div>
+
+        `;
+
+
+        refresh();
+
+    }
+
+    catch(error){
+
+        console.error(
+            'Packet inspector:',
+            error
+        );
+
+    }
+
+}
+
+
+/* ============================================
+   PROMOTE TO INCIDENT
+============================================ */
+
+async function promoteSelected(){
+
+    if(!selected){
+
+        return;
+
+    }
+
+
+    try{
+
+        const response =
+            await fetch(
+                '/api/live/promote',
+                {
+                    method:'POST',
+
+                    headers:{
+                        'Content-Type':
+                            'application/json'
+                    },
+
+                    body:JSON.stringify({
+                        packet_id:selected
+                    })
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if(!data.ok){
+
+            alert(
+                data.error ||
+                'Could not create incident'
+            );
+
+            return;
+
+        }
+
+
+        if(data.url){
+
+            window.location =
+                data.url;
+
+        }
+
+    }
+
+    catch(error){
+
+        console.error(error);
+
+        alert(
+            'Incident promotion failed.'
+        );
+
+    }
+
+}
+
+
+/* ============================================
+   INITIAL LOAD
+============================================ */
+
+refresh();
+
+
+/* ============================================
+   LIVE REFRESH
+============================================ */
+
+setInterval(
+    refresh,
+    700
+);
+
+</script>
+
+<script src="/static/aegis.js"></script>
+
+</body>
+</html>

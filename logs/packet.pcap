@@ -1,0 +1,6 @@
+from scapy.all import *
+
+packet = IP(dst="1.1.1.1")/ICMP()
+
+# Save to file
+wrpcap("test_packet.pcap", packet)

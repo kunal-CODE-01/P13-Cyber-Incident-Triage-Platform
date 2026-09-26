@@ -1,0 +1,12 @@
+Flask
+Werkzeug
+python-dotenv
+requests
+oauthlib
+scapy
+python-nmap
+pandas
+numpy
+reportlab
+gunicorn
+waitress

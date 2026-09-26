@@ -1,0 +1,36 @@
+services:
+  p13:
+    build: .
+    container_name: p13-cyber-incident-platform
+    ports:
+      - "5000:5000"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-change-this-secret}
+      HOST: 0.0.0.0
+      PORT: 5000
+    volumes:
+      - ./logs:/app/logs
+      - ./reports:/app/reports
+      - ./data:/app/data
+      - ./users.db:/app/users.db
+    restart: unless-stopped
+
+  # Optional on Linux VPS only. Enables Scapy live capture against the host network.
+  p13-live:
+    build: .
+    container_name: p13-cyber-live-capture
+    profiles: ["live-capture"]
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-change-this-secret}
+      HOST: 0.0.0.0
+      PORT: 5000
+    volumes:
+      - ./logs:/app/logs
+      - ./reports:/app/reports
+      - ./data:/app/data
+      - ./users.db:/app/users.db
+    restart: unless-stopped

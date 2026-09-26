@@ -1,0 +1,1346 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>AEGIS // Command Center</title>
+
+    <link rel="stylesheet" href="/static/aegis_ultra.css?v=8">
+</head>
+
+<body>
+
+<div class="aegis-shell">
+
+    <!-- =========================================================
+         SIDEBAR
+    ========================================================== -->
+
+    <aside class="aegis-side" id="side">
+
+        <div class="brand">
+            <div class="brandmark">AG</div>
+
+            <div>
+                <b>AEGIS</b>
+                <span>P13 SECURITY OPERATIONS</span>
+            </div>
+        </div>
+
+
+        <div class="side-section">
+            Command
+        </div>
+
+        <nav class="nav">
+
+            <a class="active" href="/dashboard">
+                <i class="ico">⌂</i>
+                <span>Command Center</span>
+            </a>
+
+            <a href="/incidents">
+                <i class="ico">◈</i>
+                <span>Incident Queue</span>
+            </a>
+
+            <a href="/incident/create">
+                <i class="ico">＋</i>
+                <span>Report Incident</span>
+            </a>
+
+            <a href="/triage">
+                <i class="ico">◎</i>
+                <span>Incident Triage</span>
+            </a>
+
+        </nav>
+
+
+        <div class="side-section">
+            Monitoring
+        </div>
+
+        <nav class="nav">
+
+            <a href="/live">
+                <i class="ico">⌁</i>
+                <span>Live Packet Monitor</span>
+            </a>
+
+            <a href="#arsenal">
+                <i class="ico">◉</i>
+                <span>Detection Arsenal</span>
+            </a>
+
+            <a href="#analytics">
+                <i class="ico">▥</i>
+                <span>Security Analytics</span>
+            </a>
+
+        </nav>
+
+
+        <div class="side-section">
+            Operations
+        </div>
+
+        <nav class="nav">
+
+            <a href="/admin">
+                <i class="ico">⚙</i>
+                <span>Admin Console</span>
+            </a>
+
+            <a href="/download_report">
+                <i class="ico">⇩</i>
+                <span>Reports</span>
+            </a>
+
+        </nav>
+
+
+        <div class="side-bottom">
+
+            <div class="side-user">
+                <b>{{ session.get('user') }}</b>
+
+                <small>
+                    {{ session.get('role','user')|upper }}
+                    • ACTIVE SESSION
+                </small>
+            </div>
+
+            <a class="logout" href="/logout">
+                Sign out
+            </a>
+
+        </div>
+
+    </aside>
+
+
+    <!-- =========================================================
+         MAIN
+    ========================================================== -->
+
+    <main class="aegis-main">
+
+        <!-- TOP BAR -->
+
+        <header class="top">
+
+            <div class="top-left">
+
+                <button class="toggle" onclick="toggleSide()">
+                    ☰
+                </button>
+
+                <div class="crumb">
+                    <strong>AEGIS SOC</strong>
+                    / COMMAND CENTER
+                </div>
+
+            </div>
+
+
+            <div class="top-right">
+
+                <span class="status">
+                    ● SYSTEM ONLINE
+                </span>
+
+                <span
+                    class="status mono"
+                    id="clock">
+                </span>
+
+                <a
+                    class="btn primary"
+                    href="/incident/create">
+                    ＋ NEW INCIDENT
+                </a>
+
+            </div>
+
+        </header>
+
+
+        <!-- =====================================================
+             PAGE CONTENT
+        ====================================================== -->
+
+        <div class="content">
+
+
+            <!-- =================================================
+                 HERO
+            ================================================== -->
+
+            <section class="hero">
+
+                <div class="hero-card">
+
+                    <div class="eyebrow">
+                        P13 • CYBER INCIDENT TRIAGE PLATFORM
+                    </div>
+
+
+                    <h1>
+                        Security operations with
+                        <br>
+
+                        <span style="color:var(--cyan)">
+                            traceable incident response.
+                        </span>
+                    </h1>
+
+
+                    <p>
+                        Centralize incident triage, network reconnaissance,
+                        live packet monitoring, packet forensics and security
+                        findings in one SOC workflow.
+                    </p>
+
+
+                    <div class="hero-actions">
+
+                        <a
+                            class="btn primary"
+                            href="/triage">
+                            ◎ Run Incident Triage
+                        </a>
+
+                        <a
+                            class="btn"
+                            href="/live">
+                            ▶ Live Packet Monitor
+                        </a>
+
+                        <a
+                            class="btn"
+                            href="/incidents">
+                            ◈ Incident Queue
+                        </a>
+
+                    </div>
+
+                </div>
+
+
+                <!-- OPERATIONAL STATUS -->
+
+                <div class="hero-card">
+
+                    <div class="eyebrow">
+                        OPERATIONAL STATUS
+                    </div>
+
+
+                    <div style="margin-top:20px;">
+
+                        <div
+                            style="
+                            display:flex;
+                            justify-content:space-between;
+                            gap:15px;
+                            margin-bottom:14px;
+                            ">
+
+                            <span>
+                                Incident Engine
+                            </span>
+
+                            <span class="badge sev-low">
+                                READY
+                            </span>
+
+                        </div>
+
+
+                        <div
+                            style="
+                            display:flex;
+                            justify-content:space-between;
+                            gap:15px;
+                            margin-bottom:14px;
+                            ">
+
+                            <span>
+                                Packet Monitor
+                            </span>
+
+                            <span class="badge sev-low">
+                                AVAILABLE
+                            </span>
+
+                        </div>
+
+
+                        <div
+                            style="
+                            display:flex;
+                            justify-content:space-between;
+                            gap:15px;
+                            margin-bottom:14px;
+                            ">
+
+                            <span>
+                                Network Triage
+                            </span>
+
+                            <span class="badge sev-low">
+                                READY
+                            </span>
+
+                        </div>
+
+
+                        <div
+                            style="
+                            display:flex;
+                            justify-content:space-between;
+                            gap:15px;
+                            ">
+
+                            <span>
+                                Incident Queue
+                            </span>
+
+                            <span class="badge sev-low">
+                                {{ incident_stats.total }} TRACKED
+                            </span>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        style="
+                        margin-top:20px;
+                        color:#60758b;
+                        font-size:11px;
+                        line-height:1.7;
+                        ">
+
+                        Current dashboard values are loaded from
+                        the P13 incident workflow and recent SOC
+                        event records.
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =================================================
+                 INCIDENT METRICS
+            ================================================== -->
+
+            <section class="metrics">
+
+
+                <div class="metric cyan">
+
+                    <div class="label">
+                        Total incidents
+                    </div>
+
+                    <div class="num">
+                        {{ incident_stats.total }}
+                    </div>
+
+                    <div class="hint">
+                        All tracked security events
+                    </div>
+
+                </div>
+
+
+                <div class="metric red">
+
+                    <div class="label">
+                        Critical open
+                    </div>
+
+                    <div class="num">
+                        {{ incident_stats.critical }}
+                    </div>
+
+                    <div class="hint">
+                        Immediate attention
+                    </div>
+
+                </div>
+
+
+                <div class="metric amber">
+
+                    <div class="label">
+                        High priority
+                    </div>
+
+                    <div class="num">
+                        {{ incident_stats.high }}
+                    </div>
+
+                    <div class="hint">
+                        Requires triage
+                    </div>
+
+                </div>
+
+
+                <div class="metric blue">
+
+                    <div class="label">
+                        Investigating
+                    </div>
+
+                    <div class="num">
+                        {{ incident_stats.investigating }}
+                    </div>
+
+                    <div class="hint">
+                        Analyst activity
+                    </div>
+
+                </div>
+
+
+                <div class="metric green">
+
+                    <div class="label">
+                        Resolved
+                    </div>
+
+                    <div class="num">
+                        {{ incident_stats.resolved }}
+                    </div>
+
+                    <div class="hint">
+                        Closed successfully
+                    </div>
+
+                </div>
+
+
+            </section>
+
+
+
+            <!-- =================================================
+                 INTEGRATED INCIDENT TRIAGE
+            ================================================== -->
+
+            <section class="section">
+
+                <div class="section-head">
+
+                    <h2>
+                        Integrated Incident Triage
+                    </h2>
+
+                    <span>
+                        TARGET → SCAN → ASSESS → INCIDENT
+                    </span>
+
+                </div>
+
+
+                <div
+                    class="module"
+                    style="padding:24px;">
+
+                    <div class="eyebrow">
+                        AUTHORIZED SECURITY ASSESSMENT
+                    </div>
+
+
+                    <h3
+                        style="
+                        font-size:20px;
+                        margin:10px 0 8px;
+                        ">
+
+                        Run a full triage against a target
+
+                    </h3>
+
+
+                    <p>
+
+                        Enter an IP address or domain to run the
+                        P13 triage workflow. The result combines
+                        common-port status, firewall/ACL indication,
+                        Geo-IP context, threat scoring and analyst
+                        recommendations.
+
+                    </p>
+
+
+                    <form
+                        action="/triage"
+                        method="post"
+                        style="
+                        display:flex;
+                        gap:10px;
+                        flex-wrap:wrap;
+                        margin-top:18px;
+                        ">
+
+
+                        <input
+                            class="input"
+                            type="text"
+                            name="target"
+                            placeholder="Target IP or domain e.g. 192.168.1.10"
+                            required
+                            style="
+                            flex:1;
+                            min-width:260px;
+                            "
+                        >
+
+
+                        <button
+                            class="btn primary"
+                            type="submit">
+
+                            ◎ RUN FULL TRIAGE
+
+                        </button>
+
+
+                    </form>
+
+
+                    <div
+                        style="
+                        display:flex;
+                        gap:18px;
+                        flex-wrap:wrap;
+                        margin-top:16px;
+                        color:#60758b;
+                        font-size:11px;
+                        ">
+
+                        <span>
+                            • Port state analysis
+                        </span>
+
+                        <span>
+                            • Firewall indication
+                        </span>
+
+                        <span>
+                            • Geo-IP enrichment
+                        </span>
+
+                        <span>
+                            • Threat score
+                        </span>
+
+                        <span>
+                            • Incident creation
+                        </span>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =================================================
+                 RESPONSE PIPELINE
+            ================================================== -->
+
+            <section class="section">
+
+                <div class="section-head">
+
+                    <h2>
+                        P13 Response Pipeline
+                    </h2>
+
+                    <span>
+                        DETECT → TRIAGE → INVESTIGATE → RESOLVE
+                    </span>
+
+                </div>
+
+
+                <div class="workflow">
+
+
+                    <div class="step done">
+
+                        <small>01</small>
+
+                        <b>
+                            Detect
+                        </b>
+
+                        <small>
+                            Nmap • Logs • Packets
+                        </small>
+
+                    </div>
+
+
+                    <div class="step active">
+
+                        <small>02</small>
+
+                        <b>
+                            Triage
+                        </b>
+
+                        <small>
+                            Severity + priority
+                        </small>
+
+                    </div>
+
+
+                    <div class="step">
+
+                        <small>03</small>
+
+                        <b>
+                            Assign
+                        </b>
+
+                        <small>
+                            Analyst ownership
+                        </small>
+
+                    </div>
+
+
+                    <div class="step">
+
+                        <small>04</small>
+
+                        <b>
+                            Investigate
+                        </b>
+
+                        <small>
+                            Evidence + IOC
+                        </small>
+
+                    </div>
+
+
+                    <div class="step">
+
+                        <small>05</small>
+
+                        <b>
+                            Contain
+                        </b>
+
+                        <small>
+                            Response action
+                        </small>
+
+                    </div>
+
+
+                    <div class="step">
+
+                        <small>06</small>
+
+                        <b>
+                            Close
+                        </b>
+
+                        <small>
+                            Audit + report
+                        </small>
+
+                    </div>
+
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =================================================
+                 DETECTION ARSENAL
+            ================================================== -->
+
+            <section
+                class="section"
+                id="arsenal">
+
+                <div class="section-head">
+
+                    <h2>
+                        Detection Arsenal
+                    </h2>
+
+                    <span>
+                        CONTROLLED SECURITY OPERATIONS
+                    </span>
+
+                </div>
+
+
+                <div class="grid modules">
+
+
+                    <!-- INCIDENT TRIAGE -->
+
+                    <div class="module">
+
+                        <div class="icon">
+                            ◎
+                        </div>
+
+                        <h3>
+                            Incident Triage
+                        </h3>
+
+                        <p>
+                            Run the integrated target assessment
+                            covering ports, firewall indication,
+                            Geo-IP, threat score and recommendations.
+                        </p>
+
+                        <a
+                            class="btn primary"
+                            href="/triage">
+
+                            Open Triage
+
+                        </a>
+
+                    </div>
+
+
+
+                    <!-- NETWORK RECON -->
+
+                    <div class="module">
+
+                        <div class="icon">
+                            ⌖
+                        </div>
+
+                        <h3>
+                            Network Recon
+                        </h3>
+
+                        <p>
+                            Run controlled common-port discovery
+                            and review OPEN, CLOSED and FILTERED
+                            results.
+                        </p>
+
+
+                        <form
+                            action="/network"
+                            method="post">
+
+                            <input
+                                class="input"
+                                name="ip"
+                                placeholder="Target IP"
+                                required
+                            >
+
+                            <button
+                                class="btn"
+                                type="submit">
+
+                                Run Recon
+
+                            </button>
+
+                        </form>
+
+                    </div>
+
+
+
+                    <!-- PCAP -->
+
+                    <div class="module">
+
+                        <div class="icon">
+                            ▦
+                        </div>
+
+                        <h3>
+                            PCAP / Packet Forensics
+                        </h3>
+
+                        <p>
+                            Import Wireshark
+                            <b>.pcap</b>
+                            or
+                            <b>.pcapng</b>
+                            captures and inspect packet-level
+                            findings.
+                        </p>
+
+
+                        <form
+                            action="/packet"
+                            method="post"
+                            enctype="multipart/form-data">
+
+                            <input
+                                class="file"
+                                type="file"
+                                name="file"
+                                accept=".pcap,.pcapng,.cap,.txt"
+                                required
+                            >
+
+                            <button
+                                class="btn"
+                                type="submit">
+
+                                Import & Analyze
+
+                            </button>
+
+                        </form>
+
+                    </div>
+
+
+
+                    <!-- LIVE PACKET -->
+
+                    <div class="module">
+
+                        <div class="icon">
+                            ⌁
+                        </div>
+
+                        <h3>
+                            Live Packet Monitor
+                        </h3>
+
+                        <p>
+                            Wireshark-style real-time packet stream
+                            using Scapy on the selected host interface.
+                        </p>
+
+
+                        <a
+                            class="btn"
+                            href="/live">
+
+                            Open Live Monitor
+
+                        </a>
+
+                    </div>
+
+
+
+                    <!-- LOG ANALYSIS -->
+
+                    <div class="module">
+
+                        <div class="icon">
+                            ≡
+                        </div>
+
+                        <h3>
+                            Log Analysis
+                        </h3>
+
+                        <p>
+                            Analyze uploaded logs for brute force,
+                            unauthorized access and suspicious
+                            IP activity.
+                        </p>
+
+
+                        <form
+                            action="/log"
+                            method="post"
+                            enctype="multipart/form-data">
+
+                            <input
+                                class="file"
+                                type="file"
+                                name="logfile"
+                                required
+                            >
+
+
+                            <button
+                                class="btn"
+                                type="submit">
+
+                                Analyze Logs
+
+                            </button>
+
+                        </form>
+
+                    </div>
+
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =================================================
+                 RECENT INCIDENTS + EVENTS
+            ================================================== -->
+
+            <div class="grid lower">
+
+
+                <!-- RECENT INCIDENT QUEUE -->
+
+                <section class="section">
+
+                    <div class="section-head">
+
+                        <h2>
+                            Recent Incident Queue
+                        </h2>
+
+                        <a
+                            class="btn"
+                            href="/incidents">
+
+                            View all
+
+                        </a>
+
+                    </div>
+
+
+                    <div class="table-wrap">
+
+                        <table class="table">
+
+                            <tr>
+
+                                <th>
+                                    ID
+                                </th>
+
+                                <th>
+                                    Type
+                                </th>
+
+                                <th>
+                                    Severity
+                                </th>
+
+                                <th>
+                                    Status
+                                </th>
+
+                                <th>
+                                    Owner
+                                </th>
+
+                            </tr>
+
+
+                            {% for i in incident_stats.recent %}
+
+                            <tr>
+
+                                <td>
+
+                                    <a
+                                        class="code"
+                                        href="/incident/{{i[0]}}">
+
+                                        {{i[1]}}
+
+                                    </a>
+
+                                </td>
+
+
+                                <td>
+                                    {{i[4]}}
+                                </td>
+
+
+                                <td>
+
+                                    <span
+                                        class="badge sev-{{i[5]|lower}}">
+
+                                        {{i[5]}}
+
+                                    </span>
+
+                                </td>
+
+
+                                <td>
+                                    {{i[6]}}
+                                </td>
+
+
+                                <td>
+                                    {{i[10] or 'Unassigned'}}
+                                </td>
+
+                            </tr>
+
+
+                            {% else %}
+
+                            <tr>
+
+                                <td colspan="5">
+
+                                    No incidents yet.
+
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+
+                        </table>
+
+                    </div>
+
+                </section>
+
+
+
+                <!-- SOC EVENT STREAM -->
+
+                <section class="section">
+
+                    <div class="section-head">
+
+                        <h2>
+                            SOC Event Stream
+                        </h2>
+
+                        <span>
+                            RECENT
+                        </span>
+
+                    </div>
+
+
+                    <div class="feed">
+
+
+                        {% for n in notifications %}
+
+                        <a
+                            class="feed-item"
+                            href="/incident/{{n[2]}}">
+
+                            <i class="feed-dot"></i>
+
+
+                            <div>
+
+                                <b>
+                                    {{n[3]}}
+                                </b>
+
+                                <p>
+                                    {{n[4]}} • {{n[5]}}
+                                </p>
+
+                            </div>
+
+                        </a>
+
+
+                        {% else %}
+
+                        <div
+                            style="
+                            color:#60758b;
+                            font-size:10px;
+                            ">
+
+                            No recent security events.
+
+                        </div>
+
+                        {% endfor %}
+
+
+                    </div>
+
+                </section>
+
+            </div>
+
+
+
+            <!-- =================================================
+                 SECURITY OPERATIONS
+            ================================================== -->
+
+            <section
+                class="section"
+                id="analytics">
+
+
+                <div class="section-head">
+
+                    <h2>
+                        Security Operations
+                    </h2>
+
+                    <span>
+                        DATA-DRIVEN SOC WORKFLOW
+                    </span>
+
+                </div>
+
+
+                <div class="grid modules">
+
+
+                    <!-- INCIDENT MANAGEMENT -->
+
+                    <div class="module">
+
+                        <div class="icon">
+                            ◈
+                        </div>
+
+                        <h3>
+                            Incident Management
+                        </h3>
+
+                        <p>
+                            Review, assign, investigate and resolve
+                            incidents through the tracked P13 lifecycle.
+                        </p>
+
+                        <a
+                            class="btn"
+                            href="/incidents">
+
+                            Open Incident Queue
+
+                        </a>
+
+                    </div>
+
+
+
+                    <!-- PACKET VISIBILITY -->
+
+                    <div class="module">
+
+                        <div class="icon">
+                            ⌁
+                        </div>
+
+                        <h3>
+                            Packet Visibility
+                        </h3>
+
+                        <p>
+                            Capture live traffic or inspect imported
+                            PCAP/PCAPNG evidence for investigation.
+                        </p>
+
+                        <a
+                            class="btn"
+                            href="/live">
+
+                            Open Packet Monitor
+
+                        </a>
+
+                    </div>
+
+
+
+                    <!-- REPORTS -->
+
+                    <div class="module">
+
+                        <div class="icon">
+                            ⇩
+                        </div>
+
+                        <h3>
+                            Security Reports
+                        </h3>
+
+                        <p>
+                            Generate the available P13 security report
+                            from recorded incident and investigation data.
+                        </p>
+
+                        <a
+                            class="btn"
+                            href="/download_report">
+
+                            Open Reports
+
+                        </a>
+
+                    </div>
+
+
+
+                    <!-- ADMIN -->
+
+                    <div class="module">
+
+                        <div class="icon">
+                            ⚙
+                        </div>
+
+                        <h3>
+                            Administration
+                        </h3>
+
+                        <p>
+                            Manage administrative operations and review
+                            available system activity.
+                        </p>
+
+                        <a
+                            class="btn"
+                            href="/admin">
+
+                            Admin Console
+
+                        </a>
+
+                    </div>
+
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =================================================
+                 FOOTER
+            ================================================== -->
+
+            <div class="footer">
+
+                AEGIS SOC • P13 CYBER INCIDENT REPORTING & TRIAGE
+                • AUTHENTICATION • MONITORING • EVIDENCE • AUDIT
+
+            </div>
+
+
+        </div>
+
+    </main>
+
+</div>
+
+
+
+<!-- =========================================================
+     JAVASCRIPT
+========================================================== -->
+
+<script>
+
+function toggleSide() {
+
+    const side = document.getElementById("side");
+
+    side.classList.toggle("collapsed");
+
+    localStorage.setItem(
+        "aegis_side",
+        side.classList.contains("collapsed")
+            ? "1"
+            : "0"
+    );
+}
+
+
+/* Restore sidebar state */
+
+if (
+    localStorage.getItem("aegis_side") === "1"
+) {
+
+    document
+        .getElementById("side")
+        .classList
+        .add("collapsed");
+
+}
+
+
+/* Live clock */
+
+function updateClock() {
+
+    const clock =
+        document.getElementById("clock");
+
+    if (!clock) {
+        return;
+    }
+
+    const now = new Date();
+
+    clock.textContent =
+        now.toLocaleTimeString();
+
+}
+
+updateClock();
+
+setInterval(
+    updateClock,
+    1000
+);
+
+
+/* Mobile behaviour */
+
+function mobile() {
+
+    if (window.innerWidth < 760) {
+
+        document
+            .getElementById("side")
+            .classList
+            .remove("collapsed");
+
+    }
+
+}
+
+</script>
+
+
+</body>
+</html>

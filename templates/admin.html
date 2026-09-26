@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+
+    <title>AEGIS • SOC Admin Console</title>
+
+    <link rel="stylesheet" href="/static/p13.css">
+
+    <style>
+        /* =====================================================
+           AEGIS ADMIN CONSOLE
+        ===================================================== */
+
+        .admin-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .admin-stat {
+            min-height: 105px;
+            padding: 18px;
+            border: 1px solid rgba(255,255,255,.08);
+            background: linear-gradient(
+                145deg,
+                rgba(255,255,255,.045),
+                rgba(255,255,255,.018)
+            );
+            border-radius: 12px;
+        }
+
+        .admin-stat .stat-label {
+            color: #8f9baa;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .admin-stat .stat-value {
+            margin-top: 9px;
+            font-size: 27px;
+            font-weight: 700;
+        }
+
+        .admin-stat .stat-sub {
+            margin-top: 4px;
+            color: #687585;
+            font-size: 11px;
+        }
+
+        .audit-card {
+            overflow: hidden;
+        }
+
+        .audit-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .audit-search {
+            min-width: 260px;
+            flex: 1;
+            max-width: 420px;
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,.10);
+            border-radius: 8px;
+            background: rgba(0,0,0,.20);
+            color: #e9eef5;
+            outline: none;
+        }
+
+        .audit-search:focus {
+            border-color: rgba(80,170,255,.55);
+        }
+
+        .audit-filter {
+            display: flex;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 7px 11px;
+            border-radius: 7px;
+            border: 1px solid rgba(255,255,255,.08);
+            background: rgba(255,255,255,.025);
+            color: #aeb8c5;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .filter-btn.active,
+        .filter-btn:hover {
+            color: #fff;
+            border-color: rgba(75,160,255,.45);
+            background: rgba(75,160,255,.10);
+        }
+
+        .audit-table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 760px;
+        }
+
+        .audit-table th {
+            padding: 11px 10px;
+            text-align: left;
+            color: #7f8b99;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            border-bottom: 1px solid rgba(255,255,255,.08);
+            white-space: nowrap;
+        }
+
+        .audit-table td {
+            padding: 12px 10px;
+            border-bottom: 1px solid rgba(255,255,255,.045);
+            color: #dce3eb;
+            font-size: 12px;
+            vertical-align: middle;
+        }
+
+        .audit-table tr:hover {
+            background: rgba(255,255,255,.018);
+        }
+
+        .audit-time {
+            color: #9da9b6;
+            font-family: Consolas, monospace;
+            white-space: nowrap;
+        }
+
+        .audit-user {
+            font-weight: 600;
+            color: #f0f4f8;
+        }
+
+        .audit-action {
+            color: #cdd7e2;
+        }
+
+        .audit-id {
+            color: #657181;
+            font-family: Consolas, monospace;
+        }
+
+        .audit-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .04em;
+        }
+
+        .audit-badge.info {
+            color: #9ccaff;
+            background: rgba(66,145,255,.10);
+            border: 1px solid rgba(66,145,255,.18);
+        }
+
+        .audit-badge.success {
+            color: #82e2ad;
+            background: rgba(55,190,115,.10);
+            border: 1px solid rgba(55,190,115,.18);
+        }
+
+        .audit-badge.warning {
+            color: #ffd27a;
+            background: rgba(240,175,55,.10);
+            border: 1px solid rgba(240,175,55,.18);
+        }
+
+        .audit-badge.danger {
+            color: #ff9292;
+            background: rgba(235,75,75,.10);
+            border: 1px solid rgba(235,75,75,.18);
+        }
+
+        .audit-dot {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-right: 7px;
+            background: #55aaff;
+        }
+
+        .incident-mini {
+            font-family: Consolas, monospace;
+            color: #9eb7d3;
+        }
+
+        .empty-state {
+            padding: 28px;
+            text-align: center;
+            color: #697583;
+        }
+
+        .section-description {
+            color: #7e8b99;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        .severity-critical {
+            color: #ff8585;
+        }
+
+        .severity-high {
+            color: #ffad76;
+        }
+
+        .severity-medium {
+            color: #ffd277;
+        }
+
+        .severity-low {
+            color: #83dca8;
+        }
+
+        @media (max-width: 1000px) {
+            .admin-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 650px) {
+            .admin-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .audit-search {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="shell">
+
+    <!-- =====================================================
+         SIDEBAR
+    ====================================================== -->
+    <aside class="sidebar">
+
+        <div class="brand">
+
+            <div class="brandmark">
+                CG
+            </div>
+
+            <div>
+                <strong>CYBERGUARD</strong>
+                <span>P13 INCIDENT RESPONSE</span>
+            </div>
+
+        </div>
+
+        <div class="nav-title">
+            Administration
+        </div>
+
+        <nav class="nav">
+
+            <a href="/dashboard">
+                <i class="ico">⌂</i>
+                <span>Command Center</span>
+            </a>
+
+            <a href="/incidents">
+                <i class="ico">◈</i>
+                <span>Incident Queue</span>
+            </a>
+
+            <a href="/live">
+                <i class="ico">◉</i>
+                <span>Live Packet Monitor</span>
+            </a>
+
+            <a class="active" href="/admin">
+                <i class="ico">⚙</i>
+                <span>Admin Console</span>
+            </a>
+
+        </nav>
+
+    </aside>
+
+
+    <!-- =====================================================
+         MAIN
+    ====================================================== -->
+    <main class="main">
+
+        <!-- TOP BAR -->
+        <div class="topbar">
+
+            <div class="crumb">
+                <b>Security Operations</b>
+                /
+                Admin Console
+            </div>
+
+            <a class="btn" href="/dashboard">
+                ← Dashboard
+            </a>
+
+        </div>
+
+
+        <!-- PAGE HEADER -->
+        <div class="page-title">
+
+            <div>
+
+                <div class="eyebrow">
+                    ADMINISTRATION & AUDIT
+                </div>
+
+                <h1>
+                    SOC Admin Console
+                </h1>
+
+                <p>
+                    Platform administration, incident oversight,
+                    authentication activity and threat telemetry.
+                </p>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             SYSTEM OVERVIEW
+        ================================================== -->
+
+        <div class="admin-grid">
+
+            <div class="admin-stat">
+
+                <div class="stat-label">
+                    Registered Users
+                </div>
+
+                <div class="stat-value">
+                    {{ users|length }}
+                </div>
+
+                <div class="stat-sub">
+                    Platform accounts
+                </div>
+
+            </div>
+
+
+            <div class="admin-stat">
+
+                <div class="stat-label">
+                    Active Incidents
+                </div>
+
+                <div class="stat-value">
+                    {{ incidents|length }}
+                </div>
+
+                <div class="stat-sub">
+                    Recent incident records
+                </div>
+
+            </div>
+
+
+            <div class="admin-stat">
+
+                <div class="stat-label">
+                    Audit Events
+                </div>
+
+                <div class="stat-value">
+                    {{ logs|length }}
+                </div>
+
+                <div class="stat-sub">
+                    Latest recorded activity
+                </div>
+
+            </div>
+
+
+            <div class="admin-stat">
+
+                <div class="stat-label">
+                    Threat Events
+                </div>
+
+                <div class="stat-value">
+                    {{ threats|length }}
+                </div>
+
+                <div class="stat-sub">
+                    Recent telemetry
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- =================================================
+             INCIDENT QUEUE
+        ================================================== -->
+
+        <section class="card">
+
+            <div class="section-head">
+
+                <div>
+
+                    <h2>
+                        Incident Queue
+                    </h2>
+
+                    <div class="section-description">
+                        Recent security incidents generated by the P13 workflow.
+                    </div>
+
+                </div>
+
+                <a class="btn" href="/incidents">
+                    Open Full Queue
+                </a>
+
+            </div>
+
+
+            <div class="table-scroll">
+
+                <table class="table">
+
+                    <tr>
+
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Type</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Assigned</th>
+                        <th>Created</th>
+                        <th></th>
+
+                    </tr>
+
+
+                    {% for i in incidents %}
+
+                    <tr>
+
+                        <td class="incident-mini">
+                            #{{ i[0] }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ i[2] }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ i[4] }}
+                        </td>
+
+                        <td>
+
+                            <span class="badge sev-{{ i[5]|lower }}">
+                                {{ i[5] }}
+                            </span>
+
+                        </td>
+
+                        <td>
+                            <span class="status-{{ i[6]|lower }}">
+                                {{ i[6] }}
+                            </span>
+                        </td>
+
+                        <td>
+                            {{ i[10] or 'Unassigned' }}
+                        </td>
+
+                        <td class="mono">
+                            {{ i[11] }}
+                        </td>
+
+                        <td>
+
+                            <a
+                                class="btn"
+                                href="/incident/{{ i[0] }}"
+                            >
+                                View
+                            </a>
+
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+
+                        <td colspan="8">
+                            <div class="empty-state">
+                                No incidents recorded.
+                            </div>
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             USERS + AUTHENTICATION AUDIT
+        ================================================== -->
+
+        <div
+            class="grid two"
+            style="margin-top:14px"
+        >
+
+            <!-- USERS -->
+
+            <section class="card">
+
+                <div class="section-head">
+
+                    <div>
+
+                        <h2>
+                            User Accounts
+                        </h2>
+
+                        <div class="section-description">
+                            Registered SOC platform identities.
+                        </div>
+
+                    </div>
+
+                    <span>
+                        {{ users|length }} accounts
+                    </span>
+
+                </div>
+
+
+                <div class="table-scroll">
+
+                    <table class="table">
+
+                        <tr>
+                            <th>User</th>
+                            <th>Role</th>
+                        </tr>
+
+                        {% for u in users %}
+
+                        <tr>
+
+                            <td>
+                                <strong>
+                                    {{ u[0] }}
+                                </strong>
+                            </td>
+
+                            <td>
+
+                                <span class="audit-badge info">
+                                    {{ u[1]|upper }}
+                                </span>
+
+                            </td>
+
+                        </tr>
+
+                        {% else %}
+
+                        <tr>
+
+                            <td colspan="2">
+                                <div class="empty-state">
+                                    No registered accounts.
+                                </div>
+                            </td>
+
+                        </tr>
+
+                        {% endfor %}
+
+                    </table>
+
+                </div>
+
+            </section>
+
+
+            <!-- AUTHENTICATION ACTIVITY -->
+
+            <section class="card audit-card">
+
+                <div class="section-head">
+
+                    <div>
+
+                        <h2>
+                            Authentication & Activity
+                        </h2>
+
+                        <div class="section-description">
+                            Recent platform actions and authentication events.
+                        </div>
+
+                    </div>
+
+                    <span>
+                        Last {{ logs|length }}
+                    </span>
+
+                </div>
+
+
+                <div class="audit-toolbar">
+
+                    <input
+                        id="auditSearch"
+                        class="audit-search"
+                        type="text"
+                        placeholder="Search user or activity..."
+                        onkeyup="filterAudit()"
+                    >
+
+                    <div class="audit-filter">
+
+                        <button
+                            class="filter-btn active"
+                            onclick="setAuditFilter('ALL', this)"
+                        >
+                            ALL
+                        </button>
+
+                        <button
+                            class="filter-btn"
+                            onclick="setAuditFilter('LOGIN', this)"
+                        >
+                            LOGIN
+                        </button>
+
+                        <button
+                            class="filter-btn"
+                            onclick="setAuditFilter('LOGOUT', this)"
+                        >
+                            LOGOUT
+                        </button>
+
+                        <button
+                            class="filter-btn"
+                            onclick="setAuditFilter('SCAN', this)"
+                        >
+                            SCAN
+                        </button>
+
+                        <button
+                            class="filter-btn"
+                            onclick="setAuditFilter('INCIDENT', this)"
+                        >
+                            INCIDENT
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div class="table-scroll">
+
+                    <table
+                        class="audit-table"
+                        id="auditTable"
+                    >
+
+                        <thead>
+
+                            <tr>
+
+                                <th>Time</th>
+                                <th>User</th>
+                                <th>Event</th>
+                                <th>Category</th>
+                                <th>Status</th>
+
+                            </tr>
+
+                        </thead>
+
+                        <tbody>
+
+                            {% for l in logs %}
+
+                            {% set action = l[1]|string %}
+
+                            {% set action_upper = action|upper %}
+
+                            <tr
+                                data-event="{{ action_upper }}"
+                            >
+
+                                <td class="audit-time">
+                                    {{ l[2] }}
+                                </td>
+
+                                <td class="audit-user">
+                                    {{ l[0] }}
+                                </td>
+
+                                <td class="audit-action">
+                                    <span class="audit-dot"></span>
+                                    {{ l[1] }}
+                                </td>
+
+                                <td>
+
+                                    {% if 'LOGIN' in action_upper %}
+
+                                        <span class="audit-badge success">
+                                            AUTHENTICATION
+                                        </span>
+
+                                    {% elif 'LOGOUT' in action_upper %}
+
+                                        <span class="audit-badge warning">
+                                            SESSION
+                                        </span>
+
+                                    {% elif 'SCAN' in action_upper %}
+
+                                        <span class="audit-badge info">
+                                            RECON
+                                        </span>
+
+                                    {% elif 'INCIDENT' in action_upper %}
+
+                                        <span class="audit-badge danger">
+                                            INCIDENT
+                                        </span>
+
+                                    {% elif 'PACKET' in action_upper %}
+
+                                        <span class="audit-badge info">
+                                            NETWORK
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="audit-badge info">
+                                            SYSTEM
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+                                <td>
+
+                                    {% if 'FAILED' in action_upper
+                                          or 'DENIED' in action_upper
+                                          or 'ERROR' in action_upper %}
+
+                                        <span class="audit-badge danger">
+                                            FAILED
+                                        </span>
+
+                                    {% elif 'LOGIN' in action_upper
+                                          or 'LOGOUT' in action_upper %}
+
+                                        <span class="audit-badge success">
+                                            RECORDED
+                                        </span>
+
+                                    {% else %}
+
+                                        <span class="audit-badge info">
+                                            INFO
+                                        </span>
+
+                                    {% endif %}
+
+                                </td>
+
+                            </tr>
+
+                            {% else %}
+
+                            <tr>
+
+                                <td colspan="5">
+
+                                    <div class="empty-state">
+                                        No authentication or activity events recorded.
+                                    </div>
+
+                                </td>
+
+                            </tr>
+
+                            {% endfor %}
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </section>
+
+        </div>
+
+
+        <!-- =================================================
+             THREAT TELEMETRY
+        ================================================== -->
+
+        <section
+            class="card"
+            style="margin-top:14px"
+        >
+
+            <div class="section-head">
+
+                <div>
+
+                    <h2>
+                        Threat Telemetry
+                    </h2>
+
+                    <div class="section-description">
+                        Security detections generated by reconnaissance,
+                        analysis and monitoring modules.
+                    </div>
+
+                </div>
+
+                <span>
+                    Recent detections
+                </span>
+
+            </div>
+
+
+            <div class="table-scroll">
+
+                <table class="table">
+
+                    <tr>
+
+                        <th>Time</th>
+                        <th>Source</th>
+                        <th>Threat</th>
+                        <th>Severity</th>
+
+                    </tr>
+
+
+                    {% for t in threats %}
+
+                    <tr>
+
+                        <td class="mono">
+                            {{ t[3] }}
+                        </td>
+
+                        <td class="code">
+                            {{ t[0] }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ t[1] }}
+                            </strong>
+                        </td>
+
+                        <td>
+
+                            <span class="badge sev-{{ t[2]|lower }}">
+                                {{ t[2] }}
+                            </span>
+
+                        </td>
+
+                    </tr>
+
+                    {% else %}
+
+                    <tr>
+
+                        <td colspan="4">
+
+                            <div class="empty-state">
+                                No threat telemetry recorded.
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                    {% endfor %}
+
+                </table>
+
+            </div>
+
+        </section>
+
+
+        <!-- =================================================
+             AUDIT NOTE
+        ================================================== -->
+
+        <section
+            class="card"
+            style="margin-top:14px"
+        >
+
+            <div class="section-head">
+
+                <div>
+
+                    <h2>
+                        Audit Integrity
+                    </h2>
+
+                    <div class="section-description">
+                        Administrative activity generated by the P13 platform.
+                    </div>
+
+                </div>
+
+                <span class="audit-badge success">
+                    AUDIT ACTIVE
+                </span>
+
+            </div>
+
+            <div class="notice">
+
+                Authentication, reconnaissance, packet-monitoring,
+                incident and administrative actions are recorded in the
+                platform activity log. Use the Incident Queue and individual
+                incident timelines for investigation-level evidence.
+
+            </div>
+
+        </section>
+
+
+        <!-- FOOTER -->
+
+        <div class="footer">
+
+            AEGIS SOC • P13 CYBER INCIDENT REPORTING & TRIAGE
+            • AUTHENTICATION • MONITORING • EVIDENCE • AUDIT
+
+        </div>
+
+    </main>
+
+</div>
+
+
+<script src="/static/aegis.js"></script>
+
+<script>
+
+let currentAuditFilter = "ALL";
+
+
+function setAuditFilter(filter, button) {
+
+    currentAuditFilter = filter;
+
+    document
+        .querySelectorAll(".filter-btn")
+        .forEach(function(btn) {
+            btn.classList.remove("active");
+        });
+
+    button.classList.add("active");
+
+    filterAudit();
+}
+
+
+function filterAudit() {
+
+    const search =
+        document
+            .getElementById("auditSearch")
+            .value
+            .toLowerCase();
+
+    const rows =
+        document
+            .querySelectorAll("#auditTable tbody tr");
+
+    rows.forEach(function(row) {
+
+        const event =
+            (row.dataset.event || "").toUpperCase();
+
+        const text =
+            row.innerText.toLowerCase();
+
+        const matchesSearch =
+            !search ||
+            text.includes(search);
+
+        let matchesFilter = true;
+
+        if (currentAuditFilter !== "ALL") {
+
+            matchesFilter =
+                event.includes(currentAuditFilter);
+
+        }
+
+        row.style.display =
+            matchesSearch && matchesFilter
+                ? ""
+                : "none";
+
+    });
+
+}
+
+</script>
+
+</body>
+</html>

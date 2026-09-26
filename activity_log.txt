@@ -1,0 +1,54 @@
+2026-04-10 09:46:02.304409 | Log Analysis | 
+        Total IPs: 100000
+        Unique IPs: 5
+        Failed Attempts: 49847
+        Suspicious IPs: ['198.51.100.22 (19925 times)', '172.16.0.3 (20105 times)', '203.0.113.45 (19974 times)', '192.168.1.10 (20062 times)', '10.0.0.5 (19934 times)']
+        
+2026-04-10 09:46:22.061584 | Network Scan | []
+2026-04-10 09:48:09.342511 | Network Scan | []
+2026-04-10 09:50:19.404968 | Log Analysis | 
+        Total IPs: 100000
+        Unique IPs: 5
+        Failed Attempts: 49847
+        Suspicious IPs: ['198.51.100.22 (19925 times)', '172.16.0.3 (20105 times)', '203.0.113.45 (19974 times)', '192.168.1.10 (20062 times)', '10.0.0.5 (19934 times)']
+        
+2026-04-10 09:52:02.750810 | Network Scan | [445]
+2026-04-10 09:52:43.914788 | Network Scan | [25, 110, 143]
+2026-04-10 09:55:07.106876 | Packet Analysis | ['SQL Injection Detected']
+2026-04-10 09:55:19.145545 | Packet Analysis | ['XSS Attack Detected']
+2026-04-10 10:18:31.891165 | Log Analysis | {'Total Logs': 117982, 'Suspicious IPs': ['198.51.100.22 (19925 hits)', '172.16.0.3 (20105 hits)', '203.0.113.45 (19974 hits)', '192.168.1.10 (20062 hits)', '10.0.0.5 (19934 hits)'], 'Brute Force IPs': ['198.51.100.22', '172.16.0.3', '203.0.113.45', '192.168.1.10', '10.0.0.5'], 'Unauthorized Access': ['None']}
+2026-04-10 10:18:41.946194 | Network Scan | ['25 (SMTP)', '110 (POP3)', '143 (IMAP)']
+2026-04-10 10:20:18.269128 | Network Scan | ['25 (SMTP)', '110 (POP3)', '143 (IMAP)']
+2026-04-10 10:20:31.941684 | Network Scan | ['25 (SMTP)', '110 (POP3)', '143 (IMAP)']
+2026-04-10 10:20:47.552564 | Network Scan | ['25 (SMTP)', '110 (POP3)', '143 (IMAP)']
+2026-04-10 10:21:15.878194 | Network Scan | ['25 (SMTP)', '110 (POP3)', '143 (IMAP)']
+2026-04-10 10:21:34.182426 | Network Scan | ['25 (SMTP)', '110 (POP3)', '143 (IMAP)']
+2026-04-10 10:24:44.006834 | Network Scan | ['445 (SMB)']
+2026-04-10 10:24:58.429504 | Network Scan | ['25 (SMTP)', '110 (POP3)', '143 (IMAP)']
+2026-04-10 10:25:38.921120 | Network Scan | ['25 (SMTP)', '110 (POP3)', '143 (IMAP)']
+2026-04-10 10:25:42.853946 | Network Scan | ['25 (SMTP)', '110 (POP3)', '143 (IMAP)']
+2026-04-10 10:27:33.157079 | Threat Intelligence | {'Threat Feed': ['192.168.1.100', '45.67.89.10', '203.0.113.5'], 'Analysis': 'These IPs are known malicious sources (simulated data)'}
+2026-04-10 10:31:37.432569 | Network Scan | []
+2026-04-10 10:31:50.142023 | Network Scan | []
+2026-04-10 10:31:55.595503 | Threat Intelligence | {'Threat Feed': ['192.168.1.100', '45.67.89.10'], 'Source': 'Simulated Threat Database'}
+2026-04-10 10:32:16.326658 | Log Analysis | {'Total Logs': 117982, 'Top IPs': {'172.16.0.3': 20105, '192.168.1.10': 20062, '203.0.113.45': 19974, '10.0.0.5': 19934, '198.51.100.22': 19925}, 'Suspicious IPs': ['198.51.100.22', '172.16.0.3', '203.0.113.45', '192.168.1.10', '10.0.0.5'], 'Brute Force Detected': ['198.51.100.22', '203.0.113.45', '172.16.0.3', '192.168.1.10', '10.0.0.5'], 'Unauthorized Access Logs': []}
+2026-04-10 10:50:28.404047 | Network Scan | ['No open ports found']
+2026-04-10 10:50:47.363929 | Network Scan | ['No open ports found']
+2026-04-10 10:52:33.659213 | Network Scan | [{'port': 135, 'service': 'msrpc', 'state': 'open'}, {'port': 445, 'service': 'microsoft-ds', 'state': 'open'}, {'port': 902, 'service': 'vmware-auth', 'state': 'open'}, {'port': 912, 'service': 'vmware-auth', 'state': 'open'}, {'port': 1001, 'service': 'webpush', 'state': 'open'}, {'port': 5000, 'service': 'http', 'state': 'open'}]
+2026-04-10 10:53:14.011839 | Log Analysis | {'Total Logs': 117982, 'Top IPs': {'172.16.0.3': 20105, '192.168.1.10': 20062, '203.0.113.45': 19974, '10.0.0.5': 19934, '198.51.100.22': 19925}, 'Suspicious IPs': ['198.51.100.22', '172.16.0.3', '203.0.113.45', '192.168.1.10', '10.0.0.5'], 'Brute Force Detected': ['198.51.100.22', '203.0.113.45', '172.16.0.3', '192.168.1.10', '10.0.0.5'], 'Unauthorized Access Logs': []}
+2026-04-10 10:57:47.862082 | Network Scan | [{'port': 135, 'service': 'msrpc', 'state': 'open'}, {'port': 445, 'service': 'microsoft-ds', 'state': 'open'}, {'port': 5000, 'service': 'upnp', 'state': 'open'}]
+2026-04-10 10:58:04.818349 | Network Scan | [{'port': '-', 'service': 'No open ports found', 'state': 'filtered'}]
+2026-04-10 10:58:15.042392 | Threat Intelligence | {'Threat Feed': ['192.168.1.100', '45.67.89.10'], 'Source': 'Simulated Threat Database'}
+2026-04-10 11:10:56.213425 | Network Scan | [{'port': 135, 'service': 'msrpc', 'state': 'open'}, {'port': 445, 'service': 'microsoft-ds', 'state': 'open'}, {'port': 5000, 'service': 'upnp', 'state': 'open'}]
+2026-04-13 09:22:50.671509 | Threat Intelligence | {'Threat Feed': ['192.168.1.100', '45.67.89.10'], 'Source': 'Simulated Threat Database'}
+2026-04-13 09:23:34.460337 | Log Analysis | {'Total Logs': 117982, 'Top IPs': {'172.16.0.3': 20105, '192.168.1.10': 20062, '203.0.113.45': 19974, '10.0.0.5': 19934, '198.51.100.22': 19925}, 'Suspicious IPs': ['198.51.100.22', '172.16.0.3', '203.0.113.45', '192.168.1.10', '10.0.0.5'], 'Brute Force Detected': ['198.51.100.22', '203.0.113.45', '172.16.0.3', '192.168.1.10', '10.0.0.5'], 'Unauthorized Access Logs': []}
+2026-04-13 19:22:49.032892 | Packet Analysis | ['Xss Detected']
+2026-04-13 19:23:21.509968 | Log Analysis | {'Total Logs': 117982, 'Top IPs': {'172.16.0.3': 20105, '192.168.1.10': 20062, '203.0.113.45': 19974, '10.0.0.5': 19934, '198.51.100.22': 19925}, 'Suspicious IPs': ['198.51.100.22', '172.16.0.3', '203.0.113.45', '192.168.1.10', '10.0.0.5'], 'Brute Force Detected': ['198.51.100.22', '203.0.113.45', '172.16.0.3', '192.168.1.10', '10.0.0.5'], 'Unauthorized Access Logs': []}
+2026-04-13 19:26:14.787974 | Log Analysis | {'Total Logs': 117982, 'Top IPs': {'172.16.0.3': 20105, '192.168.1.10': 20062, '203.0.113.45': 19974, '10.0.0.5': 19934, '198.51.100.22': 19925}, 'Suspicious IPs': ['198.51.100.22', '172.16.0.3', '203.0.113.45', '192.168.1.10', '10.0.0.5'], 'Brute Force Detected': ['198.51.100.22', '203.0.113.45', '172.16.0.3', '192.168.1.10', '10.0.0.5'], 'Unauthorized Access Logs': []}
+2026-04-13 19:27:19.081249 | URL Threat Analysis | {'URL': 'https://www.bing.com/search?q=yamunanagr+news+29+jan+2025&gs_lcrp=EgRlZGdlKgcIAhBFGMIDMgcIABBFGMIDMgcIARBFGMIDMgcIAhBFGMIDMgcIAxBFGMIDMgsIBBDsBxiPARjqAjILCAUQ7AcYjwEY6gIyCwgGEOwHGI8BGOoCMgsIBxDsBxiPARjqAtIBCDc0ODNqMGoxqAIIsAIB&FORM=ANSPA1&PC=SCOODB', 'Risk Level': 'SAFE', 'Checked Keywords': ['login', 'verify', 'bank', 'secure', 'update']}
+2026-04-13 19:31:41.783025 | Log Analysis | {'Total Logs': 117982, 'Top IPs': {'172.16.0.3': 20105, '192.168.1.10': 20062, '203.0.113.45': 19974, '10.0.0.5': 19934, '198.51.100.22': 19925}, 'Suspicious IPs': ['198.51.100.22', '172.16.0.3', '203.0.113.45', '192.168.1.10', '10.0.0.5'], 'Brute Force Detected': ['198.51.100.22', '203.0.113.45', '172.16.0.3', '192.168.1.10', '10.0.0.5'], 'Unauthorized Access Logs': []}
+2026-04-13 19:36:38.585370 | Log Analysis | {'Total Logs': 117982, 'Top IPs': {'172.16.0.3': 20105, '192.168.1.10': 20062, '203.0.113.45': 19974, '10.0.0.5': 19934, '198.51.100.22': 19925}, 'Suspicious IPs': ['198.51.100.22', '172.16.0.3', '203.0.113.45', '192.168.1.10', '10.0.0.5'], 'Brute Force Detected': ['198.51.100.22', '203.0.113.45', '172.16.0.3', '192.168.1.10', '10.0.0.5'], 'Unauthorized Access Logs': []}
+2026-04-13 19:37:06.140800 | Network Scan | [{'port': 135, 'service': 'msrpc', 'state': 'open'}, {'port': 445, 'service': 'microsoft-ds', 'state': 'open'}, {'port': 5000, 'service': 'upnp', 'state': 'open'}]
+2026-04-14 18:26:32.457486 | Log Analysis | {'Total Logs': 117982, 'Top IPs': {'172.16.0.3': 20105, '192.168.1.10': 20062, '203.0.113.45': 19974, '10.0.0.5': 19934, '198.51.100.22': 19925}, 'Suspicious IPs': ['198.51.100.22', '172.16.0.3', '203.0.113.45', '192.168.1.10', '10.0.0.5'], 'Brute Force Detected': ['198.51.100.22', '203.0.113.45', '172.16.0.3', '192.168.1.10', '10.0.0.5'], 'Unauthorized Access Logs': []}
+2026-04-14 18:26:52.488627 | Network Scan | [{'port': 23, 'service': 'telnet', 'state': 'closed'}, {'port': 25, 'service': 'smtp', 'state': 'closed'}, {'port': 53, 'service': 'domain', 'state': 'open'}, {'port': 80, 'service': 'http', 'state': 'open'}, {'port': 443, 'service': 'https', 'state': 'open'}, {'port': 445, 'service': 'microsoft-ds', 'state': 'closed'}]
+2026-04-14 18:27:06.571289 | Threat Analysis | {'URL': 'google.co', 'Risk Level': 'SAFE', 'Checked Keywords': ['login', 'verify', 'bank', 'secure', 'update']}
